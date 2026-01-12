@@ -11,9 +11,13 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/gov-dx-sandbox/audit-service/handlers"
+	"github.com/gov-dx-sandbox/audit-service/config"
+	"github.com/gov-dx-sandbox/audit-service/database"
 	"github.com/gov-dx-sandbox/audit-service/middleware"
-	"github.com/gov-dx-sandbox/audit-service/services"
+	v1database "github.com/gov-dx-sandbox/audit-service/v1/database"
+	v1handlers "github.com/gov-dx-sandbox/audit-service/v1/handlers"
+	v1models "github.com/gov-dx-sandbox/audit-service/v1/models"
+	v1services "github.com/gov-dx-sandbox/audit-service/v1/services"
 )
 
 // Build information - set during build
@@ -23,40 +27,53 @@ var (
 	GitCommit = "unknown"
 )
 
-// Database-related functions are now in database.go
-
 func main() {
 	// Parse command line flags
 	var (
-		env  = flag.String("env", getEnvOrDefault("ENVIRONMENT", "production"), "Environment (development, production)")
-		port = flag.String("port", getEnvOrDefault("PORT", "3001"), "Port to listen on")
+		env  = flag.String("env", config.GetEnvOrDefault("ENVIRONMENT", "production"), "Environment (development, production)")
+		port = flag.String("port", config.GetEnvOrDefault("PORT", "3001"), "Port to listen on")
 	)
 	flag.Parse()
 
 	// Server configuration
 	serverPort := *port
 
-	// Initialize database connection
-	dbConfig := NewDatabaseConfig()
-	slog.Info("Connecting to database",
-		"host", dbConfig.Host,
-		"port", dbConfig.Port,
-		"database", dbConfig.Database)
+	// Load enum configuration from YAML file
+	configPath := config.GetEnvOrDefault("AUDIT_ENUMS_CONFIG", "config/enums.yaml")
+	enums, err := config.LoadEnums(configPath)
+	if err != nil {
+		slog.Warn("Failed to load enum configuration, using defaults", "error", err, "path", configPath)
+		enums = config.GetDefaultEnums()
+	}
+	slog.Info("Loaded enum configuration", "path", configPath,
+		"eventTypes", len(enums.EventTypes),
+		"eventActions", len(enums.EventActions),
+		"actorTypes", len(enums.ActorTypes),
+		"targetTypes", len(enums.TargetTypes))
 
-	// Initialize GORM connection for management events
-	gormDB, err := ConnectGORM(dbConfig)
+	// Initialize enum configuration in models package
+	// Pass the AuditEnums instance to leverage O(1) validation methods
+	v1models.SetEnumConfig(enums)
+
+	// Initialize database connection
+	dbConfig := database.NewDatabaseConfig()
+	if dbConfig.Type == database.DatabaseTypeSQLite {
+		slog.Info("Connecting to database",
+			"type", "SQLite",
+			"database_path", dbConfig.DatabasePath)
+	} else {
+		slog.Info("Connecting to database",
+			"type", "PostgreSQL",
+			"host", dbConfig.Host,
+			"database", dbConfig.Database)
+	}
+
+	// Initialize GORM connection
+	gormDB, err := database.ConnectGormDB(dbConfig)
 	if err != nil {
 		slog.Error("Failed to connect to database via GORM", "error", err)
 		os.Exit(1)
 	}
-
-	// Initialize services
-	dataExchangeEventService := services.NewDataExchangeEventService(gormDB)
-	managementEventService := services.NewManagementEventService(gormDB)
-
-	// Initialize handlers
-	dataExchangeEventHandler := handlers.NewDataExchangeEventHandler(dataExchangeEventService)
-	managementEventHandler := handlers.NewManagementEventHandler(managementEventService)
 
 	// Setup routes
 	mux := http.NewServeMux()
@@ -91,25 +108,18 @@ func main() {
 		json.NewEncoder(w).Encode(response)
 	})
 
-	// API endpoint for data exchange events from Orchestration Engine
-	mux.HandleFunc("/api/data-exchange-events", func(w http.ResponseWriter, r *http.Request) {
-		switch r.Method {
-		case http.MethodPost:
-			dataExchangeEventHandler.CreateDataExchangeEvent(w, r)
-		case http.MethodGet:
-			dataExchangeEventHandler.GetDataExchangeEvents(w, r)
-		default:
-			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		}
-	})
+	// Initialize v1 API with database-agnostic repository
+	v1Repository := v1database.NewGormRepository(gormDB)
+	v1AuditService := v1services.NewAuditService(v1Repository)
+	v1AuditHandler := v1handlers.NewAuditHandler(v1AuditService)
 
-	// API endpoints for management events from Portal Backend
-	mux.HandleFunc("/api/management-events", func(w http.ResponseWriter, r *http.Request) {
+	// API endpoint for generalized audit logs (V1)
+	mux.HandleFunc("/api/audit-logs", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodPost:
-			managementEventHandler.CreateManagementEvent(w, r)
+			v1AuditHandler.CreateAuditLog(w, r)
 		case http.MethodGet:
-			managementEventHandler.GetManagementEvents(w, r)
+			v1AuditHandler.GetAuditLogs(w, r)
 		default:
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		}
@@ -123,11 +133,7 @@ func main() {
 		"buildTime", BuildTime,
 		"gitCommit", GitCommit)
 	slog.Info("Database configuration",
-		"host", dbConfig.Host,
-		"port", dbConfig.Port,
-		"database", dbConfig.Database,
-		"choreoHost", os.Getenv("CHOREO_OPENDIF_DB_HOSTNAME"),
-		"fallbackHost", os.Getenv("DB_HOST"))
+		"database_path", dbConfig.DatabasePath)
 
 	// Setup CORS middleware
 	corsMiddleware := middleware.NewCORSMiddleware()

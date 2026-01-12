@@ -13,8 +13,8 @@ ARG GIT_COMMIT
 RUN apk add --no-cache git ca-certificates tzdata
 
 # Copy go mod files and source code
-COPY go.mod go.sum ./
-COPY . ./
+COPY audit-service/go.mod audit-service/go.sum ./
+COPY audit-service/ ./
 # Download dependencies
 RUN go mod download
 
@@ -29,7 +29,7 @@ FROM alpine:3.17
 # Install runtime dependencies
 RUN apk --no-cache add ca-certificates tzdata wget
 
-# Create non-root user with specific UID for WSO2 Choreo compliance
+# Create non-root user
 RUN adduser -D -s /bin/sh -u 10001 appuser
 
 # Set working directory

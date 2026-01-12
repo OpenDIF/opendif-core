@@ -7,10 +7,10 @@ import (
 	"github.com/ginaxu1/gov-dx-sandbox/exchange/orchestration-engine/configs"
 	"github.com/ginaxu1/gov-dx-sandbox/exchange/orchestration-engine/federator"
 	"github.com/ginaxu1/gov-dx-sandbox/exchange/orchestration-engine/logger"
-	"github.com/ginaxu1/gov-dx-sandbox/exchange/orchestration-engine/middleware"
 	"github.com/ginaxu1/gov-dx-sandbox/exchange/orchestration-engine/provider"
 	"github.com/ginaxu1/gov-dx-sandbox/exchange/orchestration-engine/server"
 	"github.com/gov-dx-sandbox/exchange/shared/monitoring"
+	auditclient "github.com/gov-dx-sandbox/shared/audit"
 )
 
 func main() {
@@ -35,7 +35,8 @@ func main() {
 
 	// Initialize audit middleware
 	auditServiceURL := os.Getenv("CHOREO_AUDIT_CONNECTION_SERVICEURL")
-	middleware.NewAuditMiddleware(auditServiceURL)
+	auditClient := auditclient.NewClient(auditServiceURL)
+	auditclient.InitializeGlobalAudit(auditClient)
 
 	providerHandler := provider.NewProviderHandler(config.GetProviders())
 

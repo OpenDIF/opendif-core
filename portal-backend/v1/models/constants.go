@@ -29,8 +29,25 @@ const (
 type AuditStatus string
 
 const (
-	AuditStatusSuccess AuditStatus = "success"
-	AuditStatusFailure AuditStatus = "failure"
+	AuditStatusSuccess AuditStatus = "SUCCESS"
+	AuditStatusFailure AuditStatus = "FAILURE"
+)
+
+// ActorType represents different actor types for auditing
+type ActorType string
+
+const (
+	ActorTypeAdmin  ActorType = "ADMIN"
+	ActorTypeMember ActorType = "MEMBER"
+	ActorTypeSystem ActorType = "SYSTEM"
+)
+
+// TargetType represents different target types for auditing
+type TargetType string
+
+const (
+	TargetTypeService  TargetType = "SERVICE"
+	TargetTypeResource TargetType = "RESOURCE"
 )
 
 // ResourceType represents different resource types for auditing
@@ -51,4 +68,9 @@ const (
 	MaxEmailLength       = 320 // RFC 3696 specification
 	MaxPhoneLength       = 15  // E.164 format
 	MaxEndpointLength    = 2048
+)
+
+// IDP Application Constants
+const (
+	TemplateIDM2M = "m2m-application"
 )

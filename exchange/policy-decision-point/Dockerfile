@@ -1,5 +1,5 @@
 # Multi-stage Dockerfile for Policy Decision Point
-FROM golang:1.24-alpine AS builder
+FROM golang:1.25-alpine AS builder
 
 WORKDIR /app
 
@@ -13,11 +13,11 @@ ARG GIT_COMMIT
 RUN apk add --no-cache git ca-certificates tzdata
 
 # Copy go mod files and source code
-COPY policy-decision-point/go.mod policy-decision-point/go.sum ./
-COPY policy-decision-point/ .
+COPY exchange/policy-decision-point/go.mod exchange/policy-decision-point/go.sum ./
+COPY exchange/policy-decision-point/ .
 
-# Copy shared packages
-COPY shared/ /shared/
+# Copy shared packages from exchange/shared
+COPY exchange/shared/ /shared/
 
 # Download dependencies
 RUN go mod download
