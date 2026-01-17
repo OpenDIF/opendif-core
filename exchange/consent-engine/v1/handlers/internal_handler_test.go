@@ -15,30 +15,19 @@ import (
 	"github.com/google/uuid"
 	"github.com/gov-dx-sandbox/exchange/consent-engine/v1/models"
 	"github.com/gov-dx-sandbox/exchange/consent-engine/v1/services"
+	"github.com/gov-dx-sandbox/exchange/shared/testutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
 
-func setupTestService(t *testing.T) (*services.ConsentService, sqlmock.Sqlmock) {
-	db, mock, err := sqlmock.New()
+func setupTestService(t *testing.T) (*services.ConsentService, sqlmock.Sqlmock, func()) {
+	db, mock, cleanup := testutils.SetupMockDB(t)
+
+	service, err := services.NewConsentService(db, "http://localhost:5173")
 	require.NoError(t, err)
 
-	dialector := postgres.New(postgres.Config{
-		Conn:       db,
-		DriverName: "postgres",
-	})
-
-	gormDB, err := gorm.Open(dialector, &gorm.Config{
-		SkipDefaultTransaction: true,
-	})
-	require.NoError(t, err)
-
-	service, err := services.NewConsentService(gormDB, "http://localhost:5173")
-	require.NoError(t, err)
-
-	return service, mock
+	return service, mock, cleanup
 }
 
 func TestInternalHandler_HealthCheck(t *testing.T) {
@@ -113,14 +102,16 @@ func TestInternalHandler_CreateConsent_MethodNotAllowed(t *testing.T) {
 }
 
 func TestInternalHandler_NewInternalHandler(t *testing.T) {
-	service, _ := setupTestService(t)
+	service, _, cleanup := setupTestService(t)
+	defer cleanup()
 	handler := NewInternalHandler(service)
 	assert.NotNil(t, handler)
 	assert.Equal(t, service, handler.consentService)
 }
 
 func TestInternalHandler_GetConsent_Success_WithOwnerID(t *testing.T) {
-	service, mock := setupTestService(t)
+	service, mock, cleanup := setupTestService(t)
+	defer cleanup()
 	handler := NewInternalHandler(service)
 
 	id := uuid.New()
@@ -145,7 +136,8 @@ func TestInternalHandler_GetConsent_Success_WithOwnerID(t *testing.T) {
 }
 
 func TestInternalHandler_GetConsent_Success_WithOwnerEmail(t *testing.T) {
-	service, mock := setupTestService(t)
+	service, mock, cleanup := setupTestService(t)
+	defer cleanup()
 	handler := NewInternalHandler(service)
 
 	id := uuid.New()
@@ -166,7 +158,8 @@ func TestInternalHandler_GetConsent_Success_WithOwnerEmail(t *testing.T) {
 }
 
 func TestInternalHandler_GetConsent_NotFound(t *testing.T) {
-	service, mock := setupTestService(t)
+	service, mock, cleanup := setupTestService(t)
+	defer cleanup()
 	handler := NewInternalHandler(service)
 
 	mock.ExpectQuery(regexp.QuoteMeta(`SELECT * FROM "consent_records"`)).
@@ -182,7 +175,8 @@ func TestInternalHandler_GetConsent_NotFound(t *testing.T) {
 }
 
 func TestInternalHandler_GetConsent_ContextTimeout(t *testing.T) {
-	service, mock := setupTestService(t)
+	service, mock, cleanup := setupTestService(t)
+	defer cleanup()
 	handler := NewInternalHandler(service)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Nanosecond)
@@ -202,7 +196,8 @@ func TestInternalHandler_GetConsent_ContextTimeout(t *testing.T) {
 }
 
 func TestInternalHandler_CreateConsent_Success(t *testing.T) {
-	service, mock := setupTestService(t)
+	service, mock, cleanup := setupTestService(t)
+	defer cleanup()
 	handler := NewInternalHandler(service)
 
 	// Mock GetConsentInternalView returning not found - specific query for owner_id and app_id
@@ -235,7 +230,8 @@ func TestInternalHandler_CreateConsent_Success(t *testing.T) {
 }
 
 func TestInternalHandler_CreateConsent_CreateFailed(t *testing.T) {
-	service, mock := setupTestService(t)
+	service, mock, cleanup := setupTestService(t)
+	defer cleanup()
 	handler := NewInternalHandler(service)
 
 	// Mock GetConsentInternalView returning not found - specific query
@@ -268,7 +264,8 @@ func TestInternalHandler_CreateConsent_CreateFailed(t *testing.T) {
 }
 
 func TestInternalHandler_GetConsent_InternalError(t *testing.T) {
-	service, mock := setupTestService(t)
+	service, mock, cleanup := setupTestService(t)
+	defer cleanup()
 	handler := NewInternalHandler(service)
 
 	mock.ExpectQuery(regexp.QuoteMeta(`SELECT * FROM "consent_records" WHERE owner_id = $1 AND app_id = $2 ORDER BY created_at DESC`)+".*"+regexp.QuoteMeta(` LIMIT $3`)).
@@ -285,7 +282,8 @@ func TestInternalHandler_GetConsent_InternalError(t *testing.T) {
 }
 
 func TestInternalHandler_CreateConsent_InternalError(t *testing.T) {
-	service, mock := setupTestService(t)
+	service, mock, cleanup := setupTestService(t)
+	defer cleanup()
 	handler := NewInternalHandler(service)
 
 	mock.ExpectQuery(regexp.QuoteMeta(`SELECT * FROM "consent_records" WHERE owner_id = $1 AND app_id = $2 ORDER BY created_at DESC`)+".*"+regexp.QuoteMeta(` LIMIT $3`)).

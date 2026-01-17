@@ -46,6 +46,7 @@ type JWTVerifier struct {
 	lastFetchTime time.Time
 	logger        *slog.Logger
 	httpClient    *http.Client
+	initialFetch  sync.WaitGroup // Used to wait for initial JWKS fetch
 }
 
 // NewJWTVerifier creates a new JWT verifier instance
@@ -60,13 +61,37 @@ func NewJWTVerifier(config JWTVerifierConfig) (*JWTVerifier, error) {
 	}
 
 	// Initial fetch of JWKS (non-blocking to prevent startup failure)
+	verifier.initialFetch.Add(1)
 	go func() {
+		defer verifier.initialFetch.Done()
 		if err := verifier.fetchJWKS(); err != nil {
 			verifier.logger.Warn("Failed to perform initial JWKS fetch", "error", err)
 		}
 	}()
 
 	return verifier, nil
+}
+
+// WaitForJWKS waits for the initial JWKS fetch to complete with a timeout.
+// This is useful in tests to ensure the verifier is ready before use.
+// Returns true if JWKS was successfully fetched, false if timeout occurred.
+func (jv *JWTVerifier) WaitForJWKS(timeout time.Duration) bool {
+	done := make(chan struct{})
+	go func() {
+		jv.initialFetch.Wait()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		// Check if keys were actually loaded
+		jv.keyMutex.RLock()
+		hasKeys := len(jv.keys) > 0
+		jv.keyMutex.RUnlock()
+		return hasKeys
+	case <-time.After(timeout):
+		return false
+	}
 }
 
 // fetchJWKS retrieves and caches the public keys from the JWKS endpoint

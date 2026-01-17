@@ -9,31 +9,21 @@ import (
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/google/uuid"
 	"github.com/gov-dx-sandbox/exchange/consent-engine/v1/models"
+	"github.com/gov-dx-sandbox/exchange/shared/testutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
 
-func setupMockDB(t *testing.T) (*gorm.DB, sqlmock.Sqlmock) {
-	db, mock, err := sqlmock.New()
-	require.NoError(t, err)
-
-	dialector := postgres.New(postgres.Config{
-		Conn:       db,
-		DriverName: "postgres",
-	})
-
-	gormDB, err := gorm.Open(dialector, &gorm.Config{
-		SkipDefaultTransaction: true,
-	})
-	require.NoError(t, err)
-
-	return gormDB, mock
+// setupMockDB creates a mock database for unit testing.
+// Uses shared testutils package to avoid code duplication.
+func setupMockDB(t *testing.T) (*gorm.DB, sqlmock.Sqlmock, func()) {
+	return testutils.SetupMockDB(t)
 }
 
 func TestNewConsentService(t *testing.T) {
-	db, _ := setupMockDB(t)
+	db, _, cleanup := setupMockDB(t)
+	defer cleanup()
 
 	tests := []struct {
 		name                 string
@@ -72,7 +62,8 @@ func TestNewConsentService(t *testing.T) {
 }
 
 func TestGetConsentInternalView_ByID(t *testing.T) {
-	db, mock := setupMockDB(t)
+	db, mock, cleanup := setupMockDB(t)
+	defer cleanup()
 	service, _ := NewConsentService(db, "http://portal")
 	ctx := context.Background()
 
@@ -89,10 +80,12 @@ func TestGetConsentInternalView_ByID(t *testing.T) {
 	resp, err := service.GetConsentInternalView(ctx, &idStr, nil, nil, nil)
 	require.NoError(t, err)
 	assert.Equal(t, idStr, resp.ConsentID)
+	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
 func TestUpdateConsentStatusByPortalAction(t *testing.T) {
-	db, mock := setupMockDB(t)
+	db, mock, cleanup := setupMockDB(t)
+	defer cleanup()
 	service, _ := NewConsentService(db, "http://portal")
 	ctx := context.Background()
 
@@ -128,7 +121,8 @@ func TestUpdateConsentStatusByPortalAction(t *testing.T) {
 }
 
 func TestCreateConsentRecord_New(t *testing.T) {
-	db, mock := setupMockDB(t)
+	db, mock, cleanup := setupMockDB(t)
+	defer cleanup()
 	service, _ := NewConsentService(db, "http://portal")
 	ctx := context.Background()
 
@@ -170,7 +164,8 @@ func TestCreateConsentRecord_New(t *testing.T) {
 }
 
 func TestCreateConsentRecord_ExistingMatch(t *testing.T) {
-	db, mock := setupMockDB(t)
+	db, mock, cleanup := setupMockDB(t)
+	defer cleanup()
 	service, _ := NewConsentService(db, "http://portal")
 	ctx := context.Background()
 
@@ -201,7 +196,8 @@ func TestCreateConsentRecord_ExistingMatch(t *testing.T) {
 }
 
 func TestCreateConsentRecord_RevokeAndCreate(t *testing.T) {
-	db, mock := setupMockDB(t)
+	db, mock, cleanup := setupMockDB(t)
+	defer cleanup()
 	service, _ := NewConsentService(db, "http://portal")
 	ctx := context.Background()
 
@@ -254,7 +250,8 @@ func TestCreateConsentRecord_RevokeAndCreate(t *testing.T) {
 }
 
 func TestGetConsentInternalView_ByOwnerApp(t *testing.T) {
-	db, mock := setupMockDB(t)
+	db, mock, cleanup := setupMockDB(t)
+	defer cleanup()
 	service, _ := NewConsentService(db, "http://portal")
 	ctx := context.Background()
 
@@ -275,7 +272,8 @@ func TestGetConsentInternalView_ByOwnerApp(t *testing.T) {
 }
 
 func TestGetConsentInternalView_ExpiredPending(t *testing.T) {
-	db, mock := setupMockDB(t)
+	db, mock, cleanup := setupMockDB(t)
+	defer cleanup()
 	service, _ := NewConsentService(db, "http://portal")
 	ctx := context.Background()
 
@@ -302,7 +300,8 @@ func TestGetConsentInternalView_ExpiredPending(t *testing.T) {
 }
 
 func TestCreateConsentRecord_InvalidInput(t *testing.T) {
-	db, _ := setupMockDB(t)
+	db, _, cleanup := setupMockDB(t)
+	defer cleanup()
 	service, _ := NewConsentService(db, "http://portal")
 	ctx := context.Background()
 
@@ -322,7 +321,8 @@ func TestCreateConsentRecord_InvalidInput(t *testing.T) {
 }
 
 func TestGetConsentInternalView_ExpiredApproved(t *testing.T) {
-	db, mock := setupMockDB(t)
+	db, mock, cleanup := setupMockDB(t)
+	defer cleanup()
 	service, _ := NewConsentService(db, "http://portal")
 	ctx := context.Background()
 
@@ -349,7 +349,8 @@ func TestGetConsentInternalView_ExpiredApproved(t *testing.T) {
 }
 
 func TestCreateConsentRecord_DurationsAndTypes(t *testing.T) {
-	db, mock := setupMockDB(t)
+	db, mock, cleanup := setupMockDB(t)
+	defer cleanup()
 	service, _ := NewConsentService(db, "http://portal")
 	ctx := context.Background()
 
@@ -392,7 +393,8 @@ func TestCreateConsentRecord_DurationsAndTypes(t *testing.T) {
 }
 
 func TestRevokeConsent(t *testing.T) {
-	db, mock := setupMockDB(t)
+	db, mock, cleanup := setupMockDB(t)
+	defer cleanup()
 	service, _ := NewConsentService(db, "http://portal")
 	ctx := context.Background()
 
@@ -423,7 +425,8 @@ func TestRevokeConsent(t *testing.T) {
 }
 
 func TestGetConsentInternalView_ByOwnerEmail(t *testing.T) {
-	db, mock := setupMockDB(t)
+	db, mock, cleanup := setupMockDB(t)
+	defer cleanup()
 	service, _ := NewConsentService(db, "http://portal")
 	ctx := context.Background()
 
@@ -445,7 +448,8 @@ func TestGetConsentInternalView_ByOwnerEmail(t *testing.T) {
 }
 
 func TestGetConsentInternalView_DBError(t *testing.T) {
-	db, mock := setupMockDB(t)
+	db, mock, cleanup := setupMockDB(t)
+	defer cleanup()
 	service, _ := NewConsentService(db, "http://portal")
 	ctx := context.Background()
 
@@ -462,7 +466,8 @@ func TestGetConsentInternalView_DBError(t *testing.T) {
 }
 
 func TestUpdateConsentStatusByPortalAction_InvalidAction(t *testing.T) {
-	db, _ := setupMockDB(t)
+	db, _, cleanup := setupMockDB(t)
+	defer cleanup()
 	service, _ := NewConsentService(db, "http://portal")
 	ctx := context.Background()
 
@@ -476,7 +481,8 @@ func TestUpdateConsentStatusByPortalAction_InvalidAction(t *testing.T) {
 }
 
 func TestUpdateConsentStatusByPortalAction_InvalidUUID(t *testing.T) {
-	db, _ := setupMockDB(t)
+	db, _, cleanup := setupMockDB(t)
+	defer cleanup()
 	service, _ := NewConsentService(db, "http://portal")
 	ctx := context.Background()
 
@@ -492,7 +498,8 @@ func TestUpdateConsentStatusByPortalAction_InvalidUUID(t *testing.T) {
 }
 
 func TestUpdateConsentStatusByPortalAction_NotFound(t *testing.T) {
-	db, mock := setupMockDB(t)
+	db, mock, cleanup := setupMockDB(t)
+	defer cleanup()
 	service, _ := NewConsentService(db, "http://portal")
 	ctx := context.Background()
 
@@ -513,7 +520,8 @@ func TestUpdateConsentStatusByPortalAction_NotFound(t *testing.T) {
 }
 
 func TestUpdateConsentStatusByPortalAction_Reject(t *testing.T) {
-	db, mock := setupMockDB(t)
+	db, mock, cleanup := setupMockDB(t)
+	defer cleanup()
 	service, _ := NewConsentService(db, "http://portal")
 	ctx := context.Background()
 
@@ -539,7 +547,8 @@ func TestUpdateConsentStatusByPortalAction_Reject(t *testing.T) {
 }
 
 func TestRevokeConsent_InvalidUUID(t *testing.T) {
-	db, mock := setupMockDB(t)
+	db, mock, cleanup := setupMockDB(t)
+	defer cleanup()
 	service, _ := NewConsentService(db, "http://portal")
 	ctx := context.Background()
 
@@ -554,7 +563,8 @@ func TestRevokeConsent_InvalidUUID(t *testing.T) {
 }
 
 func TestRevokeConsent_NotFound(t *testing.T) {
-	db, mock := setupMockDB(t)
+	db, mock, cleanup := setupMockDB(t)
+	defer cleanup()
 	service, _ := NewConsentService(db, "http://portal")
 	ctx := context.Background()
 
@@ -571,7 +581,8 @@ func TestRevokeConsent_NotFound(t *testing.T) {
 }
 
 func TestRevokeConsent_WrongStatus(t *testing.T) {
-	db, mock := setupMockDB(t)
+	db, mock, cleanup := setupMockDB(t)
+	defer cleanup()
 	service, _ := NewConsentService(db, "http://portal")
 	ctx := context.Background()
 
@@ -591,7 +602,8 @@ func TestRevokeConsent_WrongStatus(t *testing.T) {
 }
 
 func TestGetConsentPortalView_Success(t *testing.T) {
-	db, mock := setupMockDB(t)
+	db, mock, cleanup := setupMockDB(t)
+	defer cleanup()
 	service, _ := NewConsentService(db, "http://portal")
 	ctx := context.Background()
 
@@ -611,7 +623,8 @@ func TestGetConsentPortalView_Success(t *testing.T) {
 }
 
 func TestGetConsentPortalView_InvalidUUID(t *testing.T) {
-	db, _ := setupMockDB(t)
+	db, _, cleanup := setupMockDB(t)
+	defer cleanup()
 	service, _ := NewConsentService(db, "http://portal")
 	ctx := context.Background()
 
@@ -621,7 +634,8 @@ func TestGetConsentPortalView_InvalidUUID(t *testing.T) {
 }
 
 func TestGetConsentPortalView_NotFound(t *testing.T) {
-	db, mock := setupMockDB(t)
+	db, mock, cleanup := setupMockDB(t)
+	defer cleanup()
 	service, _ := NewConsentService(db, "http://portal")
 	ctx := context.Background()
 
@@ -647,7 +661,8 @@ func TestParseGrantDuration_AllCases(t *testing.T) {
 	}
 
 	for _, dur := range validDurations {
-		db, mock := setupMockDB(t)
+		db, mock, cleanup := setupMockDB(t)
+	defer cleanup()
 		service, _ := NewConsentService(db, "http://portal")
 		ctx := context.Background()
 
