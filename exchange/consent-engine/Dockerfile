@@ -16,6 +16,7 @@ RUN apk add --no-cache git ca-certificates tzdata
 COPY exchange/consent-engine/go.mod exchange/consent-engine/go.sum ./exchange/consent-engine/
 COPY exchange/shared/monitoring/ ./exchange/shared/monitoring/
 COPY exchange/shared/utils/ ./exchange/shared/utils/
+COPY exchange/shared/testutils/ ./exchange/shared/testutils/
 
 # Copy go mod files and source code
 COPY exchange/consent-engine/ ./exchange/consent-engine/
