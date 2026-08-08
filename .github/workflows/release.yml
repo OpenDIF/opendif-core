@@ -15,21 +15,13 @@ env:
   REGISTRY: ghcr.io
 
 jobs:
-  build-all-services:
+  prepare:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      packages: write
-      security-events: write
-    env:
-      GIT_COMMIT: ${{ github.sha }}
-
+    outputs:
+      version: ${{ steps.version.outputs.tag }}
+      build_time: ${{ steps.build-time.outputs.build_time }}
+      dry_run: ${{ steps.dry-run.outputs.enabled }}
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0 # Fetch all history for proper versioning
-
       - name: Set Build Time
         id: build-time
         run: |
@@ -57,16 +49,6 @@ jobs:
             echo "🧪 DRY RUN mode - will build but NOT push images"
           fi
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Log in to Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Extract version from tag
         id: version
         run: |
@@ -80,373 +62,166 @@ jobs:
           echo "tag=${VERSION}" >> $GITHUB_OUTPUT
           echo "Extracted version tag: ${VERSION}"
 
-      - name: Extract metadata for Portal Backend
-        id: meta-portal
+  build-and-push:
+    needs: prepare
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      security-events: write
+    strategy:
+      # Never let one service's failure cancel the builds still in flight for the others.
+      fail-fast: false
+      matrix:
+        service:
+          - name: portal-backend
+            context: .
+            dockerfile: ./portal-backend/Dockerfile
+            image: portal-backend
+            description: Portal Backend service for the Data Exchange platform
+          - name: policy-decision-point
+            context: ./exchange/policy-decision-point
+            dockerfile: ./exchange/policy-decision-point/Dockerfile
+            image: policy-decision-point
+            description: Policy Decision Point service for authorization decisions
+          - name: consent-engine
+            context: ./exchange/consent-engine
+            dockerfile: ./exchange/consent-engine/Dockerfile
+            image: consent-engine
+            description: Consent Engine service for managing data consent workflows
+          - name: orchestration-engine
+            context: ./exchange/orchestration-engine
+            dockerfile: ./exchange/orchestration-engine/Dockerfile
+            image: orchestration-engine
+            description: Orchestration Engine service for coordinating data exchange workflows
+          - name: admin-portal
+            context: ./portals/admin-portal
+            dockerfile: ./portals/admin-portal/Dockerfile
+            image: admin-portal
+            description: Admin Portal for the Data Exchange platform
+          - name: consent-portal
+            context: ./portals/consent-portal
+            dockerfile: ./portals/consent-portal/Dockerfile
+            image: consent-portal
+            description: Consent Portal for the Data Exchange platform
+          - name: member-portal
+            context: ./portals/member-portal
+            dockerfile: ./portals/member-portal/Dockerfile
+            image: member-portal
+            description: Member Portal for the Data Exchange platform
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ github.repository }}/portal-backend
+          images: ${{ env.REGISTRY }}/${{ github.repository }}/${{ matrix.service.image }}
           tags: |
             type=semver,pattern={{version}},enable=${{ github.event_name == 'push' }}
             type=semver,pattern={{major}}.{{minor}},enable=${{ github.event_name == 'push' }}
             type=semver,pattern={{major}},enable=${{ github.event_name == 'push' }}
-            type=raw,value=${{ steps.version.outputs.tag }},enable=${{ github.event_name == 'workflow_dispatch' }}
+            type=raw,value=${{ needs.prepare.outputs.version }},enable=${{ github.event_name == 'workflow_dispatch' }}
             type=raw,value=latest
             type=sha,format=long
           labels: |
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
-            org.opencontainers.image.description=Portal Backend service for the Data Exchange platform
+            org.opencontainers.image.description=${{ matrix.service.description }}
             org.opencontainers.image.licenses=Apache-2.0
-            org.opencontainers.image.version=${{ steps.version.outputs.tag }}
+            org.opencontainers.image.version=${{ needs.prepare.outputs.version }}
 
-      - name: Build and push Portal Backend
+      - name: Build and push
+        id: build-push
         uses: docker/build-push-action@v5
         with:
-          context: .
-          file: ./portal-backend/Dockerfile
-          push: ${{ steps.dry-run.outputs.enabled == 'true' }}
-          tags: ${{ steps.meta-portal.outputs.tags }}
-          labels: ${{ steps.meta-portal.outputs.labels }}
+          context: ${{ matrix.service.context }}
+          file: ${{ matrix.service.dockerfile }}
+          push: ${{ needs.prepare.outputs.dry_run == 'true' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
           build-args: |
-            SERVICE_PATH=portal-backend
-            BUILD_VERSION=${{ steps.version.outputs.tag }}
-            BUILD_TIME=${{ steps.build-time.outputs.build_time }}
-            GIT_COMMIT=${{ env.GIT_COMMIT }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+            SERVICE_PATH=${{ matrix.service.name }}
+            BUILD_VERSION=${{ needs.prepare.outputs.version }}
+            BUILD_TIME=${{ needs.prepare.outputs.build_time }}
+            GIT_COMMIT=${{ github.sha }}
+          cache-from: type=gha,scope=${{ matrix.service.name }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.service.name }}
 
-      - name: Extract metadata for Policy Decision Point
-        id: meta-pdp
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ github.repository }}/policy-decision-point
-          tags: |
-            type=semver,pattern={{version}},enable=${{ github.event_name == 'push' }}
-            type=semver,pattern={{major}}.{{minor}},enable=${{ github.event_name == 'push' }}
-            type=semver,pattern={{major}},enable=${{ github.event_name == 'push' }}
-            type=raw,value=${{ steps.version.outputs.tag }},enable=${{ github.event_name == 'workflow_dispatch' }}
-            type=raw,value=latest
-            type=sha,format=long
-          labels: |
-            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
-            org.opencontainers.image.description=Policy Decision Point service for authorization decisions
-            org.opencontainers.image.licenses=Apache-2.0
-            org.opencontainers.image.version=${{ steps.version.outputs.tag }}
-
-      - name: Build and push Policy Decision Point
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: ./exchange/policy-decision-point/Dockerfile
-          push: ${{ steps.dry-run.outputs.enabled == 'true' }}
-          tags: ${{ steps.meta-pdp.outputs.tags }}
-          labels: ${{ steps.meta-pdp.outputs.labels }}
-          build-args: |
-            SERVICE_PATH=policy-decision-point
-            BUILD_VERSION=${{ steps.version.outputs.tag }}
-            BUILD_TIME=${{ steps.build-time.outputs.build_time }}
-            GIT_COMMIT=${{ env.GIT_COMMIT }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Extract metadata for Consent Engine
-        id: meta-consent
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ github.repository }}/consent-engine
-          tags: |
-            type=semver,pattern={{version}},enable=${{ github.event_name == 'push' }}
-            type=semver,pattern={{major}}.{{minor}},enable=${{ github.event_name == 'push' }}
-            type=semver,pattern={{major}},enable=${{ github.event_name == 'push' }}
-            type=raw,value=${{ steps.version.outputs.tag }},enable=${{ github.event_name == 'workflow_dispatch' }}
-            type=raw,value=latest
-            type=sha,format=long
-          labels: |
-            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
-            org.opencontainers.image.description=Consent Engine service for managing data consent workflows
-            org.opencontainers.image.licenses=Apache-2.0
-            org.opencontainers.image.version=${{ steps.version.outputs.tag }}
-
-      - name: Build and push Consent Engine
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: ./exchange/consent-engine/Dockerfile
-          push: ${{ steps.dry-run.outputs.enabled == 'true' }}
-          tags: ${{ steps.meta-consent.outputs.tags }}
-          labels: ${{ steps.meta-consent.outputs.labels }}
-          build-args: |
-            SERVICE_PATH=consent-engine
-            BUILD_VERSION=${{ steps.version.outputs.tag }}
-            BUILD_TIME=${{ steps.build-time.outputs.build_time }}
-            GIT_COMMIT=${{ env.GIT_COMMIT }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Extract metadata for Orchestration Engine
-        id: meta-orchestration
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ github.repository }}/orchestration-engine
-          tags: |
-            type=semver,pattern={{version}},enable=${{ github.event_name == 'push' }}
-            type=semver,pattern={{major}}.{{minor}},enable=${{ github.event_name == 'push' }}
-            type=semver,pattern={{major}},enable=${{ github.event_name == 'push' }}
-            type=raw,value=${{ steps.version.outputs.tag }},enable=${{ github.event_name == 'workflow_dispatch' }}
-            type=raw,value=latest
-            type=sha,format=long
-          labels: |
-            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
-            org.opencontainers.image.description=Orchestration Engine service for coordinating data exchange workflows
-            org.opencontainers.image.licenses=Apache-2.0
-            org.opencontainers.image.version=${{ steps.version.outputs.tag }}
-
-      - name: Build and push Orchestration Engine
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: ./exchange/orchestration-engine/Dockerfile
-          push: ${{ steps.dry-run.outputs.enabled == 'true' }}
-          tags: ${{ steps.meta-orchestration.outputs.tags }}
-          labels: ${{ steps.meta-orchestration.outputs.labels }}
-          build-args: |
-            SERVICE_PATH=orchestration-engine
-            BUILD_VERSION=${{ steps.version.outputs.tag }}
-            BUILD_TIME=${{ steps.build-time.outputs.build_time }}
-            GIT_COMMIT=${{ env.GIT_COMMIT }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Extract metadata for Admin Portal
-        id: meta-admin-portal
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ github.repository }}/admin-portal
-          tags: |
-            type=semver,pattern={{version}},enable=${{ github.event_name == 'push' }}
-            type=semver,pattern={{major}}.{{minor}},enable=${{ github.event_name == 'push' }}
-            type=semver,pattern={{major}},enable=${{ github.event_name == 'push' }}
-            type=raw,value=${{ steps.version.outputs.tag }},enable=${{ github.event_name == 'workflow_dispatch' }}
-            type=raw,value=latest
-            type=sha,format=long
-          labels: |
-            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
-            org.opencontainers.image.description=Admin Portal for the Data Exchange platform
-            org.opencontainers.image.licenses=Apache-2.0
-            org.opencontainers.image.version=${{ steps.version.outputs.tag }}
-
-      - name: Build and push Admin Portal
-        uses: docker/build-push-action@v5
-        with:
-          context: ./portals/admin-portal
-          file: ./portals/admin-portal/Dockerfile
-          push: ${{ steps.dry-run.outputs.enabled == 'true' }}
-          tags: ${{ steps.meta-admin-portal.outputs.tags }}
-          labels: ${{ steps.meta-admin-portal.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Extract metadata for Consent Portal
-        id: meta-consent-portal
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ github.repository }}/consent-portal
-          tags: |
-            type=semver,pattern={{version}},enable=${{ github.event_name == 'push' }}
-            type=semver,pattern={{major}}.{{minor}},enable=${{ github.event_name == 'push' }}
-            type=semver,pattern={{major}},enable=${{ github.event_name == 'push' }}
-            type=raw,value=${{ steps.version.outputs.tag }},enable=${{ github.event_name == 'workflow_dispatch' }}
-            type=raw,value=latest
-            type=sha,format=long
-          labels: |
-            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
-            org.opencontainers.image.description=Consent Portal for the Data Exchange platform
-            org.opencontainers.image.licenses=Apache-2.0
-            org.opencontainers.image.version=${{ steps.version.outputs.tag }}
-
-      - name: Build and push Consent Portal
-        uses: docker/build-push-action@v5
-        with:
-          context: ./portals/consent-portal
-          file: ./portals/consent-portal/Dockerfile
-          push: ${{ steps.dry-run.outputs.enabled == 'true' }}
-          tags: ${{ steps.meta-consent-portal.outputs.tags }}
-          labels: ${{ steps.meta-consent-portal.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Extract metadata for Member Portal
-        id: meta-member-portal
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ github.repository }}/member-portal
-          tags: |
-            type=semver,pattern={{version}},enable=${{ github.event_name == 'push' }}
-            type=semver,pattern={{major}}.{{minor}},enable=${{ github.event_name == 'push' }}
-            type=semver,pattern={{major}},enable=${{ github.event_name == 'push' }}
-            type=raw,value=${{ steps.version.outputs.tag }},enable=${{ github.event_name == 'workflow_dispatch' }}
-            type=raw,value=latest
-            type=sha,format=long
-          labels: |
-            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
-            org.opencontainers.image.description=Member Portal for the Data Exchange platform
-            org.opencontainers.image.licenses=Apache-2.0
-            org.opencontainers.image.version=${{ steps.version.outputs.tag }}
-
-      - name: Build and push Member Portal
-        uses: docker/build-push-action@v5
-        with:
-          context: ./portals/member-portal
-          file: ./portals/member-portal/Dockerfile
-          push: ${{ steps.dry-run.outputs.enabled == 'true' }}
-          tags: ${{ steps.meta-member-portal.outputs.tags }}
-          labels: ${{ steps.meta-member-portal.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Run Trivy vulnerability scanner - Portal Backend
-        if: steps.dry-run.outputs.enabled == 'true'
+      - name: Run Trivy vulnerability scanner
+        id: trivy
+        if: needs.prepare.outputs.dry_run == 'true'
         uses: aquasecurity/trivy-action@master
         continue-on-error: true
         with:
-          image-ref: ${{ fromJSON(steps.meta-portal.outputs.json).tags[0] }}
+          image-ref: ${{ fromJSON(steps.meta.outputs.json).tags[0] }}
           format: "sarif"
-          output: "trivy-portal-backend.sarif"
-          severity: "CRITICAL,HIGH"
-          ignore-unfixed: false
-
-      - name: Run Trivy vulnerability scanner - Policy Decision Point
-        if: steps.dry-run.outputs.enabled == 'true'
-        uses: aquasecurity/trivy-action@master
-        continue-on-error: true
-        with:
-          image-ref: ${{ fromJSON(steps.meta-pdp.outputs.json).tags[0] }}
-          format: "sarif"
-          output: "trivy-policy-decision-point.sarif"
-          severity: "CRITICAL,HIGH"
-          ignore-unfixed: false
-
-      - name: Run Trivy vulnerability scanner - Consent Engine
-        if: steps.dry-run.outputs.enabled == 'true'
-        uses: aquasecurity/trivy-action@master
-        continue-on-error: true
-        with:
-          image-ref: ${{ fromJSON(steps.meta-consent.outputs.json).tags[0] }}
-          format: "sarif"
-          output: "trivy-consent-engine.sarif"
-          severity: "CRITICAL,HIGH"
-          ignore-unfixed: false
-
-      - name: Run Trivy vulnerability scanner - Orchestration Engine
-        if: steps.dry-run.outputs.enabled == 'true'
-        uses: aquasecurity/trivy-action@master
-        continue-on-error: true
-        with:
-          image-ref: ${{ fromJSON(steps.meta-orchestration.outputs.json).tags[0] }}
-          format: "sarif"
-          output: "trivy-orchestration-engine.sarif"
-          severity: "CRITICAL,HIGH"
-          ignore-unfixed: false
-
-      - name: Run Trivy vulnerability scanner - Admin Portal
-        if: steps.dry-run.outputs.enabled == 'true'
-        uses: aquasecurity/trivy-action@master
-        continue-on-error: true
-        with:
-          image-ref: ${{ fromJSON(steps.meta-admin-portal.outputs.json).tags[0] }}
-          format: "sarif"
-          output: "trivy-admin-portal.sarif"
-          severity: "CRITICAL,HIGH"
-          ignore-unfixed: false
-
-      - name: Run Trivy vulnerability scanner - Consent Portal
-        if: steps.dry-run.outputs.enabled == 'true'
-        uses: aquasecurity/trivy-action@master
-        continue-on-error: true
-        with:
-          image-ref: ${{ fromJSON(steps.meta-consent-portal.outputs.json).tags[0] }}
-          format: "sarif"
-          output: "trivy-consent-portal.sarif"
-          severity: "CRITICAL,HIGH"
-          ignore-unfixed: false
-
-      - name: Run Trivy vulnerability scanner - Member Portal
-        if: steps.dry-run.outputs.enabled == 'true'
-        uses: aquasecurity/trivy-action@master
-        continue-on-error: true
-        with:
-          image-ref: ${{ fromJSON(steps.meta-member-portal.outputs.json).tags[0] }}
-          format: "sarif"
-          output: "trivy-member-portal.sarif"
+          output: "trivy-results.sarif"
           severity: "CRITICAL,HIGH"
           ignore-unfixed: false
 
       - name: Upload Trivy results to GitHub Security
-        if: steps.dry-run.outputs.enabled == 'true' && always()
+        if: needs.prepare.outputs.dry_run == 'true' && hashFiles('trivy-results.sarif') != ''
+        continue-on-error: true
         uses: github/codeql-action/upload-sarif@v3
         with:
-          sarif_file: |
-            trivy-portal-backend.sarif
-            trivy-policy-decision-point.sarif
-            trivy-consent-engine.sarif
-            trivy-orchestration-engine.sarif
-            trivy-admin-portal.sarif
-            trivy-consent-portal.sarif
-            trivy-member-portal.sarif
+          sarif_file: trivy-results.sarif
+          category: trivy-${{ matrix.service.image }}
 
+      - name: Job summary
+        if: always()
+        run: |
+          echo "### ${{ matrix.service.name }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Mode:** ${{ needs.prepare.outputs.dry_run == 'true' && '✅ Release' || '🧪 Dry Run' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Image:** \`${{ env.REGISTRY }}/${{ github.repository }}/${{ matrix.service.image }}:${{ needs.prepare.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
+
+  create-release:
+    needs: [prepare, build-and-push]
+    if: github.event_name == 'push' && needs.build-and-push.result == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
-        if: github.event_name == 'push'
         with:
-          tag_name: ${{ github.ref }}
-          name: Release ${{ steps.version.outputs.tag }}
+          tag_name: ${{ github.ref_name }}
+          name: Release ${{ needs.prepare.outputs.version }}
           body: |
-            ## Release ${{ steps.version.outputs.tag }}
+            ## Release ${{ needs.prepare.outputs.version }}
 
             This release includes Docker images for all services and portals:
 
-            - **Portal Backend**: `${{ fromJSON(steps.meta-portal.outputs.json).tags[0] }}`
-            - **Policy Decision Point**: `${{ fromJSON(steps.meta-pdp.outputs.json).tags[0] }}`
-            - **Consent Engine**: `${{ fromJSON(steps.meta-consent.outputs.json).tags[0] }}`
-            - **Orchestration Engine**: `${{ fromJSON(steps.meta-orchestration.outputs.json).tags[0] }}`
-            - **Admin Portal**: `${{ fromJSON(steps.meta-admin-portal.outputs.json).tags[0] }}`
-            - **Consent Portal**: `${{ fromJSON(steps.meta-consent-portal.outputs.json).tags[0] }}`
-            - **Member Portal**: `${{ fromJSON(steps.meta-member-portal.outputs.json).tags[0] }}`
+            - **Portal Backend**: `${{ env.REGISTRY }}/${{ github.repository }}/portal-backend:${{ needs.prepare.outputs.version }}`
+            - **Policy Decision Point**: `${{ env.REGISTRY }}/${{ github.repository }}/policy-decision-point:${{ needs.prepare.outputs.version }}`
+            - **Consent Engine**: `${{ env.REGISTRY }}/${{ github.repository }}/consent-engine:${{ needs.prepare.outputs.version }}`
+            - **Orchestration Engine**: `${{ env.REGISTRY }}/${{ github.repository }}/orchestration-engine:${{ needs.prepare.outputs.version }}`
+            - **Admin Portal**: `${{ env.REGISTRY }}/${{ github.repository }}/admin-portal:${{ needs.prepare.outputs.version }}`
+            - **Consent Portal**: `${{ env.REGISTRY }}/${{ github.repository }}/consent-portal:${{ needs.prepare.outputs.version }}`
+            - **Member Portal**: `${{ env.REGISTRY }}/${{ github.repository }}/member-portal:${{ needs.prepare.outputs.version }}`
 
             ### Pull Images
 
             ```bash
-            docker pull ${{ fromJSON(steps.meta-portal.outputs.json).tags[0] }}
-            docker pull ${{ fromJSON(steps.meta-pdp.outputs.json).tags[0] }}
-            docker pull ${{ fromJSON(steps.meta-consent.outputs.json).tags[0] }}
-            docker pull ${{ fromJSON(steps.meta-orchestration.outputs.json).tags[0] }}
-            docker pull ${{ fromJSON(steps.meta-admin-portal.outputs.json).tags[0] }}
-            docker pull ${{ fromJSON(steps.meta-consent-portal.outputs.json).tags[0] }}
-            docker pull ${{ fromJSON(steps.meta-member-portal.outputs.json).tags[0] }}
+            docker pull ${{ env.REGISTRY }}/${{ github.repository }}/portal-backend:${{ needs.prepare.outputs.version }}
+            docker pull ${{ env.REGISTRY }}/${{ github.repository }}/policy-decision-point:${{ needs.prepare.outputs.version }}
+            docker pull ${{ env.REGISTRY }}/${{ github.repository }}/consent-engine:${{ needs.prepare.outputs.version }}
+            docker pull ${{ env.REGISTRY }}/${{ github.repository }}/orchestration-engine:${{ needs.prepare.outputs.version }}
+            docker pull ${{ env.REGISTRY }}/${{ github.repository }}/admin-portal:${{ needs.prepare.outputs.version }}
+            docker pull ${{ env.REGISTRY }}/${{ github.repository }}/consent-portal:${{ needs.prepare.outputs.version }}
+            docker pull ${{ env.REGISTRY }}/${{ github.repository }}/member-portal:${{ needs.prepare.outputs.version }}
             ```
           draft: false
           prerelease: false
-
-      - name: Generate workflow summary
-        if: always()
-        run: |
-          echo "## Release Workflow Summary" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Version:** ${{ steps.version.outputs.tag }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Mode:** ${{ steps.dry-run.outputs.enabled == 'true' && '✅ Release' || '🧪 Dry Run' }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Commit:** ${{ env.GIT_COMMIT }}" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Built Images" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          if [ "${{ steps.dry-run.outputs.enabled }}" == "true" ]; then
-            echo "| Service | Image |" >> $GITHUB_STEP_SUMMARY
-            echo "|---------|-------|" >> $GITHUB_STEP_SUMMARY
-            echo "| Portal Backend | \`${{ fromJSON(steps.meta-portal.outputs.json).tags[0] }}\` |" >> $GITHUB_STEP_SUMMARY
-            echo "| Policy Decision Point | \`${{ fromJSON(steps.meta-pdp.outputs.json).tags[0] }}\` |" >> $GITHUB_STEP_SUMMARY
-            echo "| Consent Engine | \`${{ fromJSON(steps.meta-consent.outputs.json).tags[0] }}\` |" >> $GITHUB_STEP_SUMMARY
-            echo "| Orchestration Engine | \`${{ fromJSON(steps.meta-orchestration.outputs.json).tags[0] }}\` |" >> $GITHUB_STEP_SUMMARY
-            echo "| Admin Portal | \`${{ fromJSON(steps.meta-admin-portal.outputs.json).tags[0] }}\` |" >> $GITHUB_STEP_SUMMARY
-            echo "| Consent Portal | \`${{ fromJSON(steps.meta-consent-portal.outputs.json).tags[0] }}\` |" >> $GITHUB_STEP_SUMMARY
-            echo "| Member Portal | \`${{ fromJSON(steps.meta-member-portal.outputs.json).tags[0] }}\` |" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "Images built but not pushed (dry run mode)" >> $GITHUB_STEP_SUMMARY
-          fi
