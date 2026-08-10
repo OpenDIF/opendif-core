@@ -141,6 +141,12 @@ func Initialize(ctx context.Context, configs *configs.Config, providerHandler *p
 		}
 	}
 
+	// FoundationalIdArgName identifies the Data Owner ID argument by name in every
+	// federated query, so an empty value would silently reject all requests.
+	if configs.FoundationalIdArgName == "" {
+		return nil, fmt.Errorf("fatal configuration error: foundationalIdArgName is not configured - cannot identify the Data Owner ID argument")
+	}
+
 	// Initialize with providers from config if available
 	if configs.Providers != nil {
 		for _, p := range configs.Providers {
@@ -376,22 +382,44 @@ func (f *Federator) FederateQuery(ctx context.Context, request graphql.Request, 
 		}
 	}
 
-	// Check for Data Owner ID in extracted arguments
+	// Check for Data Owner ID in extracted arguments, identified by the configured
+	// foundational identifier argument name (e.g. "nic") — not by position.
 	var dataOwnerID string
-	if len(extractedArgs) == 0 {
-		logger.Log.Info("Data Owner ID argument is missing: extractedArgs is empty or nil")
-		return createErrorResponseWithCode("Data Owner ID argument is missing", errors.CodeMissingEntityIdentifier)
+	var foundationalIdValues []string
+	for _, arg := range extractedArgs {
+		if arg == nil || arg.Argument == nil || arg.Name == nil {
+			continue
+		}
+		if arg.Name.Value != f.Configs.FoundationalIdArgName {
+			continue
+		}
+		val := arg.Value.GetValue()
+		if s, ok := val.(string); ok && s != "" {
+			foundationalIdValues = append(foundationalIdValues, s)
+		}
 	}
-	val := extractedArgs[0].Value.GetValue()
-	if s, ok := val.(string); ok {
-		dataOwnerID = s
-	} else {
-		logger.Log.Error("CitizenID is not a string", "value", val)
-		dataOwnerID = ""
-	}
-	if dataOwnerID == "" {
-		logger.Log.Info("Data Owner ID argument is missing or invalid")
+
+	switch len(foundationalIdValues) {
+	case 0:
+		logger.Log.Info("Data Owner ID argument is missing or invalid",
+			"foundationalIdArgName", f.Configs.FoundationalIdArgName)
 		return createErrorResponseWithCode("Data Owner ID argument is missing or invalid", errors.CodeMissingEntityIdentifier)
+	case 1:
+		dataOwnerID = foundationalIdValues[0]
+	default:
+		allSame := true
+		for _, v := range foundationalIdValues[1:] {
+			if v != foundationalIdValues[0] {
+				allSame = false
+				break
+			}
+		}
+		if !allSame {
+			logger.Log.Info("Conflicting Data Owner ID values found in query",
+				"foundationalIdArgName", f.Configs.FoundationalIdArgName, "valueCount", len(foundationalIdValues))
+			return createErrorResponseWithCode("Conflicting Data Owner ID values in query", errors.CodeAmbiguousEntityIdentifier)
+		}
+		dataOwnerID = foundationalIdValues[0]
 	}
 
 	// Handle consent check if consent is required

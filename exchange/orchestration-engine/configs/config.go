@@ -33,6 +33,10 @@ type Config struct {
 	ArgMapping    []*graphql.ArgMapping `json:"argMapping,omitempty"`
 	TrustUpstream bool                  `json:"trustUpstream"`
 	JWT           JWTConfig             `json:"jwt,omitempty"`
+
+	// FoundationalIdArgName is the name of the query argument that identifies the
+	// data owner (e.g. "nic"), recognized by name rather than by position.
+	FoundationalIdArgName string `json:"foundationalIdArgName,omitempty"`
 }
 
 // ProviderConfig represents a provider configuration
