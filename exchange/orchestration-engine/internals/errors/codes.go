@@ -20,7 +20,8 @@ const (
 
 // OE-related
 const (
-	CodeMissingEntityIdentifier = "MISSING_IDENTIFIER"
+	CodeMissingEntityIdentifier   = "MISSING_IDENTIFIER"
+	CodeAmbiguousEntityIdentifier = "AMBIGUOUS_IDENTIFIER"
 )
 
 // Auth-related

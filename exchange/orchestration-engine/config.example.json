@@ -1,6 +1,7 @@
 {
   "environment": "development",
   "trustUpstream": false,
+  "foundationalIdArgName": "nic",
   "ceUrl": "http://localhost:8081",
   "pdpUrl": "http://localhost:8082",
   "auditConfig": {
