@@ -67,8 +67,9 @@ func TestFederateQuery_WithMockSchema(t *testing.T) {
 
 	// 3. Setup Config
 	cfg := &configs.Config{
-		Environment:   "test",
-		TrustUpstream: true, // Trust upstream to avoid JWT validation requirements
+		Environment:           "test",
+		TrustUpstream:         true, // Trust upstream to avoid JWT validation requirements
+		FoundationalIdArgName: "nic",
 		Providers: []*configs.ProviderConfig{
 			{
 				ProviderKey: "drp",

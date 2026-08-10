@@ -1,5 +1,6 @@
 {
   "trustUpstream": true,
+  "foundationalIdArgName": "nic",
   "ceUrl": "http://consent-engine:8081",
   "pdpUrl": "http://policy-decision-point:8082",
   "providers": [
