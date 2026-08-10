@@ -17,10 +17,12 @@ env:
 jobs:
   prepare:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     outputs:
       version: ${{ steps.version.outputs.tag }}
       build_time: ${{ steps.build-time.outputs.build_time }}
-      dry_run: ${{ steps.dry-run.outputs.enabled }}
+      should_push: ${{ steps.dry-run.outputs.enabled }}
     steps:
       - name: Set Build Time
         id: build-time
@@ -134,7 +136,7 @@ jobs:
             type=semver,pattern={{major}}.{{minor}},enable=${{ github.event_name == 'push' }}
             type=semver,pattern={{major}},enable=${{ github.event_name == 'push' }}
             type=raw,value=${{ needs.prepare.outputs.version }},enable=${{ github.event_name == 'workflow_dispatch' }}
-            type=raw,value=latest
+            type=raw,value=latest,enable=${{ !contains(needs.prepare.outputs.version, '-') }}
             type=sha,format=long
           labels: |
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
@@ -148,7 +150,7 @@ jobs:
         with:
           context: ${{ matrix.service.context }}
           file: ${{ matrix.service.dockerfile }}
-          push: ${{ needs.prepare.outputs.dry_run == 'true' }}
+          push: ${{ needs.prepare.outputs.should_push == 'true' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
@@ -161,8 +163,8 @@ jobs:
 
       - name: Run Trivy vulnerability scanner
         id: trivy
-        if: needs.prepare.outputs.dry_run == 'true'
-        uses: aquasecurity/trivy-action@master
+        if: needs.prepare.outputs.should_push == 'true'
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         continue-on-error: true
         with:
           image-ref: ${{ fromJSON(steps.meta.outputs.json).tags[0] }}
@@ -172,7 +174,7 @@ jobs:
           ignore-unfixed: false
 
       - name: Upload Trivy results to GitHub Security
-        if: needs.prepare.outputs.dry_run == 'true' && hashFiles('trivy-results.sarif') != ''
+        if: needs.prepare.outputs.should_push == 'true' && hashFiles('trivy-results.sarif') != ''
         continue-on-error: true
         uses: github/codeql-action/upload-sarif@v3
         with:
@@ -184,7 +186,7 @@ jobs:
         run: |
           echo "### ${{ matrix.service.name }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "- **Mode:** ${{ needs.prepare.outputs.dry_run == 'true' && '✅ Release' || '🧪 Dry Run' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Mode:** ${{ needs.prepare.outputs.should_push == 'true' && '✅ Release' || '🧪 Dry Run' }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Image:** \`${{ env.REGISTRY }}/${{ github.repository }}/${{ matrix.service.image }}:${{ needs.prepare.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
 
   create-release:
