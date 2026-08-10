@@ -141,6 +141,12 @@ func Initialize(ctx context.Context, configs *configs.Config, providerHandler *p
 		}
 	}
 
+	// FoundationalIdArgName identifies the Data Owner ID argument by name in every
+	// federated query, so an empty value would silently reject all requests.
+	if configs.FoundationalIdArgName == "" {
+		return nil, fmt.Errorf("fatal configuration error: foundationalIdArgName is not configured - cannot identify the Data Owner ID argument")
+	}
+
 	// Initialize with providers from config if available
 	if configs.Providers != nil {
 		for _, p := range configs.Providers {
@@ -410,7 +416,7 @@ func (f *Federator) FederateQuery(ctx context.Context, request graphql.Request, 
 		}
 		if !allSame {
 			logger.Log.Info("Conflicting Data Owner ID values found in query",
-				"foundationalIdArgName", f.Configs.FoundationalIdArgName, "values", foundationalIdValues)
+				"foundationalIdArgName", f.Configs.FoundationalIdArgName, "valueCount", len(foundationalIdValues))
 			return createErrorResponseWithCode("Conflicting Data Owner ID values in query", errors.CodeAmbiguousEntityIdentifier)
 		}
 		dataOwnerID = foundationalIdValues[0]
