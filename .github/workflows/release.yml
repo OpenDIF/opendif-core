@@ -130,7 +130,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ github.repository }}/${{ matrix.service.image }}
+          images: ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ matrix.service.image }}
           tags: |
             type=semver,pattern={{version}},enable=${{ github.event_name == 'push' }}
             type=semver,pattern={{major}}.{{minor}},enable=${{ github.event_name == 'push' }}
@@ -187,7 +187,7 @@ jobs:
           echo "### ${{ matrix.service.name }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "- **Mode:** ${{ needs.prepare.outputs.should_push == 'true' && '✅ Release' || '🧪 Dry Run' }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Image:** \`${{ env.REGISTRY }}/${{ github.repository }}/${{ matrix.service.image }}:${{ needs.prepare.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Image:** \`${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ matrix.service.image }}:${{ needs.prepare.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
 
   create-release:
     needs: [prepare, build-and-push]
@@ -206,24 +206,24 @@ jobs:
 
             This release includes Docker images for all services and portals:
 
-            - **Portal Backend**: `${{ env.REGISTRY }}/${{ github.repository }}/portal-backend:${{ needs.prepare.outputs.version }}`
-            - **Policy Decision Point**: `${{ env.REGISTRY }}/${{ github.repository }}/policy-decision-point:${{ needs.prepare.outputs.version }}`
-            - **Consent Engine**: `${{ env.REGISTRY }}/${{ github.repository }}/consent-engine:${{ needs.prepare.outputs.version }}`
-            - **Orchestration Engine**: `${{ env.REGISTRY }}/${{ github.repository }}/orchestration-engine:${{ needs.prepare.outputs.version }}`
-            - **Admin Portal**: `${{ env.REGISTRY }}/${{ github.repository }}/admin-portal:${{ needs.prepare.outputs.version }}`
-            - **Consent Portal**: `${{ env.REGISTRY }}/${{ github.repository }}/consent-portal:${{ needs.prepare.outputs.version }}`
-            - **Member Portal**: `${{ env.REGISTRY }}/${{ github.repository }}/member-portal:${{ needs.prepare.outputs.version }}`
+            - **Portal Backend**: `${{ env.REGISTRY }}/${{ github.repository_owner }}/portal-backend:${{ needs.prepare.outputs.version }}`
+            - **Policy Decision Point**: `${{ env.REGISTRY }}/${{ github.repository_owner }}/policy-decision-point:${{ needs.prepare.outputs.version }}`
+            - **Consent Engine**: `${{ env.REGISTRY }}/${{ github.repository_owner }}/consent-engine:${{ needs.prepare.outputs.version }}`
+            - **Orchestration Engine**: `${{ env.REGISTRY }}/${{ github.repository_owner }}/orchestration-engine:${{ needs.prepare.outputs.version }}`
+            - **Admin Portal**: `${{ env.REGISTRY }}/${{ github.repository_owner }}/admin-portal:${{ needs.prepare.outputs.version }}`
+            - **Consent Portal**: `${{ env.REGISTRY }}/${{ github.repository_owner }}/consent-portal:${{ needs.prepare.outputs.version }}`
+            - **Member Portal**: `${{ env.REGISTRY }}/${{ github.repository_owner }}/member-portal:${{ needs.prepare.outputs.version }}`
 
             ### Pull Images
 
             ```bash
-            docker pull ${{ env.REGISTRY }}/${{ github.repository }}/portal-backend:${{ needs.prepare.outputs.version }}
-            docker pull ${{ env.REGISTRY }}/${{ github.repository }}/policy-decision-point:${{ needs.prepare.outputs.version }}
-            docker pull ${{ env.REGISTRY }}/${{ github.repository }}/consent-engine:${{ needs.prepare.outputs.version }}
-            docker pull ${{ env.REGISTRY }}/${{ github.repository }}/orchestration-engine:${{ needs.prepare.outputs.version }}
-            docker pull ${{ env.REGISTRY }}/${{ github.repository }}/admin-portal:${{ needs.prepare.outputs.version }}
-            docker pull ${{ env.REGISTRY }}/${{ github.repository }}/consent-portal:${{ needs.prepare.outputs.version }}
-            docker pull ${{ env.REGISTRY }}/${{ github.repository }}/member-portal:${{ needs.prepare.outputs.version }}
+            docker pull ${{ env.REGISTRY }}/${{ github.repository_owner }}/portal-backend:${{ needs.prepare.outputs.version }}
+            docker pull ${{ env.REGISTRY }}/${{ github.repository_owner }}/policy-decision-point:${{ needs.prepare.outputs.version }}
+            docker pull ${{ env.REGISTRY }}/${{ github.repository_owner }}/consent-engine:${{ needs.prepare.outputs.version }}
+            docker pull ${{ env.REGISTRY }}/${{ github.repository_owner }}/orchestration-engine:${{ needs.prepare.outputs.version }}
+            docker pull ${{ env.REGISTRY }}/${{ github.repository_owner }}/admin-portal:${{ needs.prepare.outputs.version }}
+            docker pull ${{ env.REGISTRY }}/${{ github.repository_owner }}/consent-portal:${{ needs.prepare.outputs.version }}
+            docker pull ${{ env.REGISTRY }}/${{ github.repository_owner }}/member-portal:${{ needs.prepare.outputs.version }}
             ```
           draft: false
           prerelease: false

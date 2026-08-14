@@ -14,7 +14,7 @@ on:
 env:
   # === Service-specific variables ===
   SERVICE_PATH: "exchange/orchestration-engine"
-  IMAGE_NAME: ${{ github.repository }}/orchestration-engine
+  IMAGE_NAME: ${{ github.repository_owner }}/orchestration-engine
   # ================================
   REGISTRY: ghcr.io
 

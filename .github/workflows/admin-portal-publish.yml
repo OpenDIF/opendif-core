@@ -37,7 +37,7 @@ jobs:
               id: meta
               uses: docker/metadata-action@v5
               with:
-                  images: ${{ env.REGISTRY }}/${{ github.repository }}/admin-portal
+                  images: ${{ env.REGISTRY }}/${{ github.repository_owner }}/admin-portal
                   tags: |
                       type=ref,event=branch
                       type=sha,format=long
