@@ -28,8 +28,8 @@ Run on every PR when service code changes. Perform code quality checks and tests
 Run only when Dockerfiles are modified. Optimizes CI time by skipping Docker builds on code-only changes.
 
 | Workflow                                    | Triggers On                                            |
-| ------------------------------------------- | ------------------------------------------------------ |
-| `consent-engine-docker-validate.yml`        | Changes to `exchange/consent-engine/Dockerfile`        |
+|---------------------------------------------|--------------------------------------------------------|
+| `consent-engine-docker-validate.yml`        | Changes to `../../exchange/cmd/ce/Dockerfile`          |
 | `orchestration-engine-docker-validate.yml`  | Changes to `exchange/orchestration-engine/Dockerfile`  |
 | `policy-decision-point-docker-validate.yml` | Changes to `exchange/policy-decision-point/Dockerfile` |
 | `portal-backend-docker-validate.yml`        | Changes to `portal-backend/Dockerfile`                 |
@@ -104,7 +104,7 @@ Update `docker-compose.yml`:
 ```yaml
 services:
   consent-engine:
-    image: ghcr.io/{owner}/{repo}/consent-engine:latest
+    image: ghcr.io/{owner}/consent-engine:latest
     # Remove 'build:' section
 ```
 

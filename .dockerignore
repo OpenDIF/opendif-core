@@ -1,0 +1,39 @@
+# Only Go source + go.mod/go.sum are needed to build a service binary.
+# The build context is now the repo root, so exclude everything that isn't
+# Go source to keep it small and cache-stable.
+
+# Frontend apps & their dependency trees — not needed to build a Go binary
+portals/
+**/node_modules/
+
+# Other service trees not (yet) part of this Go module
+portal-backend/
+audit-service/
+observability/
+
+# Test & coverage artifacts
+coverage.out
+coverage.html
+*.test
+
+# Docs & API specs (not embedded; not copied into the final image)
+**/README.md
+**/openapi.yaml
+docs/
+
+# Local environment / secrets
+.env
+.env.*
+*.env
+
+# Docker (Dockerfiles are read directly by the engine, not via COPY)
+**/Dockerfile
+.dockerignore
+
+# VCS / editor / OS cruft
+.git/
+.github/
+.idea/
+.vscode/
+.DS_Store
+*.swp

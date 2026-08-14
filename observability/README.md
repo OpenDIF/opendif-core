@@ -350,7 +350,7 @@ All services use **OpenTelemetry** for metrics collection:
 - Records: `http_request_duration_seconds`, `http_requests_total`
 - Attributes: `http.method`, `http.route`, `http.status_code`
 
-**Exchange Services** (`exchange/shared/monitoring/otel_metrics.go`):
+**Exchange Services** (`../exchange/internal/monitoring/otel_metrics.go`):
 - Shared OpenTelemetry monitoring package with `HTTPMetricsMiddleware()`
 - Records: `http_requests_total`, `http_request_duration_seconds`
 - Additional metrics: `external_calls_total`, `business_events_total`
