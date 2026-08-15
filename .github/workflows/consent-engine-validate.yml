@@ -12,6 +12,7 @@ on:
       - "internal/utils/**"
       - "go.mod"
       - "go.sum"
+      - ".dockerignore"
       - ".github/workflows/consent-engine-validate.yml"
   workflow_dispatch:
 

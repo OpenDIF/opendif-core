@@ -64,7 +64,7 @@ Service runs on port **8081** by default.
 
 ```bash
 # From the repo root
-go test ./internal/ce/...
+go test ./cmd/ce/... ./internal/ce/... -count=1
 ```
 
 ## Docker

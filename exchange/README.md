@@ -210,7 +210,7 @@ docker compose up --build
 cd policy-decision-point && go test -v
 
 # Consent Engine (now part of the root Go module — run from the repo root)
-cd .. && go test ./internal/ce/... -v
+cd ../.. && go test ./cmd/ce/... ./internal/ce/... -v
 ```
 
 #### Integration Tests

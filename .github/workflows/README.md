@@ -10,7 +10,7 @@ Run on every PR when service code changes. Perform code quality checks and tests
 
 | Workflow                             | Service               | Triggers On                                    |
 | ------------------------------------ | --------------------- | ---------------------------------------------- |
-| `consent-engine-validate.yml`        | Consent Engine        | Changes to `exchange/consent-engine/**`        |
+| `consent-engine-validate.yml`        | Consent Engine        | Changes to `cmd/ce/**`, `internal/ce/**`       |
 | `orchestration-engine-validate.yml`  | Orchestration Engine  | Changes to `exchange/orchestration-engine/**`  |
 | `policy-decision-point-validate.yml` | Policy Decision Point | Changes to `exchange/policy-decision-point/**` |
 | `portal-backend-validate.yml`        | Portal Backend        | Changes to `portal-backend/**`                 |
@@ -29,7 +29,7 @@ Run only when Dockerfiles are modified. Optimizes CI time by skipping Docker bui
 
 | Workflow                                    | Triggers On                                            |
 |---------------------------------------------|--------------------------------------------------------|
-| `consent-engine-docker-validate.yml`        | Changes to `../../exchange/cmd/ce/Dockerfile`          |
+| `consent-engine-docker-validate.yml`        | Changes to `cmd/ce/Dockerfile`                         |
 | `orchestration-engine-docker-validate.yml`  | Changes to `exchange/orchestration-engine/Dockerfile`  |
 | `policy-decision-point-docker-validate.yml` | Changes to `exchange/policy-decision-point/Dockerfile` |
 | `portal-backend-docker-validate.yml`        | Changes to `portal-backend/Dockerfile`                 |
@@ -46,10 +46,10 @@ Build and publish Docker images to GitHub Container Registry when code is merged
 
 | Workflow                            | Service               | Image                                          |
 | ----------------------------------- | --------------------- | ---------------------------------------------- |
-| `consent-engine-publish.yml`        | Consent Engine        | `ghcr.io/{owner}/{repo}/consent-engine`        |
-| `orchestration-engine-publish.yml`  | Orchestration Engine  | `ghcr.io/{owner}/{repo}/orchestration-engine`  |
-| `policy-decision-point-publish.yml` | Policy Decision Point | `ghcr.io/{owner}/{repo}/policy-decision-point` |
-| `portal-backend-publish.yml`        | Portal Backend        | `ghcr.io/{owner}/{repo}/portal-backend`        |
+| `consent-engine-publish.yml`        | Consent Engine        | `ghcr.io/{owner}/consent-engine`               |
+| `orchestration-engine-publish.yml`  | Orchestration Engine  | `ghcr.io/{owner}/orchestration-engine`         |
+| `policy-decision-point-publish.yml` | Policy Decision Point | `ghcr.io/{owner}/policy-decision-point`        |
+| `portal-backend-publish.yml`        | Portal Backend        | `ghcr.io/{owner}/portal-backend`               |
 | `release.yml`                       | All Services          | Builds all services with version tags          |
 
 **Triggers:**
@@ -72,10 +72,9 @@ Build and publish Docker images to GitHub Container Registry when code is merged
 ## Quick Test
 
 ```bash
-# Test local build
-cd exchange
-docker build -f consent-engine/Dockerfile \
-  --build-arg SERVICE_PATH=consent-engine \
+# Test local build (from the repository root)
+docker build -f cmd/ce/Dockerfile \
+  --build-arg SERVICE_PATH=cmd/ce \
   --build-arg BUILD_VERSION=test \
   --build-arg BUILD_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ") \
   --build-arg GIT_COMMIT=test \
