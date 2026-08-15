@@ -100,8 +100,8 @@ jobs:
             image: policy-decision-point
             description: Policy Decision Point service for authorization decisions
           - name: consent-engine
-            context: ./exchange/consent-engine
-            dockerfile: ./exchange/consent-engine/Dockerfile
+            context: .
+            dockerfile: ./cmd/ce/Dockerfile
             image: consent-engine
             description: Consent Engine service for managing data consent workflows
           - name: orchestration-engine
