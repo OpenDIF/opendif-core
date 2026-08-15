@@ -63,9 +63,9 @@ jobs:
       - name: Run unit tests
         run: cd ${{ env.SERVICE_PATH }} && go test ./... -count=1
 
-      - name: Set lowercase repository name
+      - name: Set lowercase repository owner
         id: repo
-        run: echo "name=$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
+        run: echo "name=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3

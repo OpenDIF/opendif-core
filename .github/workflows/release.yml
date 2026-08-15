@@ -26,11 +26,14 @@ jobs:
     steps:
       - name: Set Build Time
         id: build-time
+        env:
+          HEAD_COMMIT_TIMESTAMP: ${{ github.event.head_commit.timestamp }}
+          REPO_PUSHED_AT: ${{ github.event.repository.pushed_at }}
         run: |
           # Fallback logic: head_commit.timestamp -> repository.pushed_at -> current time
-          TIMESTAMP="${{ github.event.head_commit.timestamp }}"
+          TIMESTAMP="$HEAD_COMMIT_TIMESTAMP"
           if [ -z "$TIMESTAMP" ]; then
-            TIMESTAMP="${{ github.event.repository.pushed_at }}"
+            TIMESTAMP="$REPO_PUSHED_AT"
           fi
           if [ -z "$TIMESTAMP" ]; then
             TIMESTAMP=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
@@ -40,10 +43,13 @@ jobs:
 
       - name: Determine if this is a dry run
         id: dry-run
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          REF: ${{ github.ref }}
         run: |
           # Only push images for tag pushes on main branch or manual dispatch
-          if [[ "${{ github.event_name }}" == "push" && "${{ github.ref }}" == refs/tags/* ]] || \
-             [[ "${{ github.event_name }}" == "workflow_dispatch" && "${{ github.ref }}" == "refs/heads/main" ]]; then
+          if [[ "$EVENT_NAME" == "push" && "$REF" == refs/tags/* ]] || \
+             [[ "$EVENT_NAME" == "workflow_dispatch" && "$REF" == "refs/heads/main" ]]; then
             echo "enabled=true" >> $GITHUB_OUTPUT
             echo "✅ Real release mode - will push images"
           else
@@ -53,14 +59,21 @@ jobs:
 
       - name: Extract version from tag
         id: version
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_VERSION: ${{ github.event.inputs.version }}
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            VERSION="${{ github.event.inputs.version }}"
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            VERSION="$INPUT_VERSION"
           else
             VERSION="${GITHUB_REF#refs/tags/}"
           fi
           # Remove leading 'v' if present
           VERSION="${VERSION#v}"
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::Invalid version format: $VERSION"
+            exit 1
+          fi
           echo "tag=${VERSION}" >> $GITHUB_OUTPUT
           echo "Extracted version tag: ${VERSION}"
 
@@ -130,7 +143,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ github.repository }}/${{ matrix.service.image }}
+          images: ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ matrix.service.image }}
           tags: |
             type=semver,pattern={{version}},enable=${{ github.event_name == 'push' }}
             type=semver,pattern={{major}}.{{minor}},enable=${{ github.event_name == 'push' }}
@@ -183,11 +196,17 @@ jobs:
 
       - name: Job summary
         if: always()
+        env:
+          SERVICE_NAME: ${{ matrix.service.name }}
+          MODE: ${{ needs.prepare.outputs.should_push == 'true' && '✅ Release' || '🧪 Dry Run' }}
+          REPO_OWNER: ${{ github.repository_owner }}
+          SERVICE_IMAGE: ${{ matrix.service.image }}
+          VERSION: ${{ needs.prepare.outputs.version }}
         run: |
-          echo "### ${{ matrix.service.name }}" >> $GITHUB_STEP_SUMMARY
+          echo "### $SERVICE_NAME" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "- **Mode:** ${{ needs.prepare.outputs.should_push == 'true' && '✅ Release' || '🧪 Dry Run' }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Image:** \`${{ env.REGISTRY }}/${{ github.repository }}/${{ matrix.service.image }}:${{ needs.prepare.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Mode:** $MODE" >> $GITHUB_STEP_SUMMARY
+          echo "- **Image:** \`${REGISTRY}/${REPO_OWNER}/${SERVICE_IMAGE}:${VERSION}\`" >> $GITHUB_STEP_SUMMARY
 
   create-release:
     needs: [prepare, build-and-push]
@@ -206,24 +225,24 @@ jobs:
 
             This release includes Docker images for all services and portals:
 
-            - **Portal Backend**: `${{ env.REGISTRY }}/${{ github.repository }}/portal-backend:${{ needs.prepare.outputs.version }}`
-            - **Policy Decision Point**: `${{ env.REGISTRY }}/${{ github.repository }}/policy-decision-point:${{ needs.prepare.outputs.version }}`
-            - **Consent Engine**: `${{ env.REGISTRY }}/${{ github.repository }}/consent-engine:${{ needs.prepare.outputs.version }}`
-            - **Orchestration Engine**: `${{ env.REGISTRY }}/${{ github.repository }}/orchestration-engine:${{ needs.prepare.outputs.version }}`
-            - **Admin Portal**: `${{ env.REGISTRY }}/${{ github.repository }}/admin-portal:${{ needs.prepare.outputs.version }}`
-            - **Consent Portal**: `${{ env.REGISTRY }}/${{ github.repository }}/consent-portal:${{ needs.prepare.outputs.version }}`
-            - **Member Portal**: `${{ env.REGISTRY }}/${{ github.repository }}/member-portal:${{ needs.prepare.outputs.version }}`
+            - **Portal Backend**: `${{ env.REGISTRY }}/${{ github.repository_owner }}/portal-backend:${{ needs.prepare.outputs.version }}`
+            - **Policy Decision Point**: `${{ env.REGISTRY }}/${{ github.repository_owner }}/policy-decision-point:${{ needs.prepare.outputs.version }}`
+            - **Consent Engine**: `${{ env.REGISTRY }}/${{ github.repository_owner }}/consent-engine:${{ needs.prepare.outputs.version }}`
+            - **Orchestration Engine**: `${{ env.REGISTRY }}/${{ github.repository_owner }}/orchestration-engine:${{ needs.prepare.outputs.version }}`
+            - **Admin Portal**: `${{ env.REGISTRY }}/${{ github.repository_owner }}/admin-portal:${{ needs.prepare.outputs.version }}`
+            - **Consent Portal**: `${{ env.REGISTRY }}/${{ github.repository_owner }}/consent-portal:${{ needs.prepare.outputs.version }}`
+            - **Member Portal**: `${{ env.REGISTRY }}/${{ github.repository_owner }}/member-portal:${{ needs.prepare.outputs.version }}`
 
             ### Pull Images
 
             ```bash
-            docker pull ${{ env.REGISTRY }}/${{ github.repository }}/portal-backend:${{ needs.prepare.outputs.version }}
-            docker pull ${{ env.REGISTRY }}/${{ github.repository }}/policy-decision-point:${{ needs.prepare.outputs.version }}
-            docker pull ${{ env.REGISTRY }}/${{ github.repository }}/consent-engine:${{ needs.prepare.outputs.version }}
-            docker pull ${{ env.REGISTRY }}/${{ github.repository }}/orchestration-engine:${{ needs.prepare.outputs.version }}
-            docker pull ${{ env.REGISTRY }}/${{ github.repository }}/admin-portal:${{ needs.prepare.outputs.version }}
-            docker pull ${{ env.REGISTRY }}/${{ github.repository }}/consent-portal:${{ needs.prepare.outputs.version }}
-            docker pull ${{ env.REGISTRY }}/${{ github.repository }}/member-portal:${{ needs.prepare.outputs.version }}
+            docker pull ${{ env.REGISTRY }}/${{ github.repository_owner }}/portal-backend:${{ needs.prepare.outputs.version }}
+            docker pull ${{ env.REGISTRY }}/${{ github.repository_owner }}/policy-decision-point:${{ needs.prepare.outputs.version }}
+            docker pull ${{ env.REGISTRY }}/${{ github.repository_owner }}/consent-engine:${{ needs.prepare.outputs.version }}
+            docker pull ${{ env.REGISTRY }}/${{ github.repository_owner }}/orchestration-engine:${{ needs.prepare.outputs.version }}
+            docker pull ${{ env.REGISTRY }}/${{ github.repository_owner }}/admin-portal:${{ needs.prepare.outputs.version }}
+            docker pull ${{ env.REGISTRY }}/${{ github.repository_owner }}/consent-portal:${{ needs.prepare.outputs.version }}
+            docker pull ${{ env.REGISTRY }}/${{ github.repository_owner }}/member-portal:${{ needs.prepare.outputs.version }}
             ```
           draft: false
           prerelease: false
