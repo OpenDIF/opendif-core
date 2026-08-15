@@ -4,7 +4,10 @@ on:
     pull_request:
         branches: [main]
         paths:
-            - "portals/consent-portal/**"
+            - "portals/apps/consent/**"
+            - "portals/package.json"
+            - "portals/pnpm-workspace.yaml"
+            - "portals/pnpm-lock.yaml"
             - ".github/workflows/consent-portal-validate.yml"
     workflow_dispatch:
 
@@ -26,20 +29,23 @@ jobs:
             - name: Checkout repository
               uses: actions/checkout@v4
 
+            - name: Set up pnpm
+              uses: pnpm/action-setup@v4
+
             - name: Set up Node.js
               uses: actions/setup-node@v4
               with:
-                  node-version: "20"
-                  cache: "npm"
-                  cache-dependency-path: portals/consent-portal/package-lock.json
+                  node-version: "24"
+                  cache: "pnpm"
+                  cache-dependency-path: portals/pnpm-lock.yaml
 
             - name: Install dependencies
-              working-directory: portals/consent-portal
-              run: npm ci
+              working-directory: portals
+              run: pnpm install --frozen-lockfile --filter consent-portal...
 
             - name: Lint
-              working-directory: portals/consent-portal
-              run: npm run lint
+              working-directory: portals
+              run: pnpm --filter consent-portal run lint
 
             - name: Set lowercase repository owner
               id: repo
@@ -51,7 +57,8 @@ jobs:
             - name: Build Docker image
               uses: docker/build-push-action@v5
               with:
-                  context: portals/consent-portal
+                  context: portals
+                  file: portals/apps/consent/Dockerfile
                   push: false
                   load: true
                   tags: ${{ env.REGISTRY }}/${{ steps.repo.outputs.name }}/consent-portal:pr-${{ github.event.pull_request.number || 'manual' }}

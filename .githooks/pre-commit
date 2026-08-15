@@ -23,9 +23,9 @@ get_service_path() {
         orchestration-engine) echo "exchange/orchestration-engine" ;;
         consent-engine) echo "exchange/consent-engine" ;;
         policy-decision-point) echo "exchange/policy-decision-point" ;;
-        member-portal) echo "portals/member-portal" ;;
-        admin-portal) echo "portals/admin-portal" ;;
-        consent-portal) echo "portals/consent-portal" ;;
+        member-portal) echo "portals/apps/member" ;;
+        admin-portal) echo "portals/apps/admin" ;;
+        consent-portal) echo "portals/apps/consent" ;;
         *) echo "" ;;
     esac
 }

@@ -23,17 +23,20 @@ The Member Portal allows participating organizations (members) to:
 
 ### Prerequisites
 
-- Node.js 18+
-- npm 9+
+- Node.js 24+
+- pnpm 9+
+
+This app is part of the `portals/` pnpm workspace — dependencies are
+installed once from `portals/`, not from within this directory.
 
 ### Run the Application
 
 ```bash
-# Install dependencies
-npm install
+# From portals/: install dependencies for the whole workspace
+pnpm install
 
-# Run in development mode
-npm run dev
+# Run this app in development mode
+pnpm --filter member-portal run dev
 ```
 
 The application will be available at `http://localhost:5173` (or configured port).
@@ -53,22 +56,22 @@ The Member Portal has two independent configuration layers:
 cp .env.example .env
 ```
 
-| Variable | Type | Example / Default | Description |
-|---|---|---|---|
-| `VITE_PORT` | Build-time | `5173` | Local dev server port |
-| `VITE_BASE_PATH` | Build-time | `/` | Public base path Vite serves the app under |
-| `VITE_API_URL` | Runtime | `http://localhost:3000` | Portal Backend API base URL |
-| `VITE_LOGS_URL` | Runtime | `http://localhost:3001` | Audit Service base URL (audit log viewer) |
-| `VITE_CLIENT_ID` | Runtime | `your_client_id` | IdP (Asgardeo) application client ID |
-| `VITE_BASE_URL` | Runtime | `https://api.asgardeo.io/t/your-org` | IdP (Asgardeo) base URL |
-| `VITE_SCOPE` | Runtime | `openid,profile` | Comma-separated OAuth scopes |
-| `VITE_SIGN_IN_REDIRECT_URL` | Runtime | `http://localhost:5173` | OIDC sign-in redirect URL |
-| `VITE_SIGN_OUT_REDIRECT_URL` | Runtime | `http://localhost:5173` | OIDC sign-out redirect URL |
+| Variable                     | Type       | Example / Default                    | Description                                |
+|------------------------------|------------|--------------------------------------|--------------------------------------------|
+| `VITE_PORT`                  | Build-time | `5173`                               | Local dev server port                      |
+| `VITE_BASE_PATH`             | Build-time | `/`                                  | Public base path Vite serves the app under |
+| `VITE_API_URL`               | Runtime    | `http://localhost:3000`              | Portal Backend API base URL                |
+| `VITE_LOGS_URL`              | Runtime    | `http://localhost:3001`              | Audit Service base URL (audit log viewer)  |
+| `VITE_CLIENT_ID`             | Runtime    | `your_client_id`                     | IdP (Asgardeo) application client ID       |
+| `VITE_BASE_URL`              | Runtime    | `https://api.asgardeo.io/t/your-org` | IdP (Asgardeo) base URL                    |
+| `VITE_SCOPE`                 | Runtime    | `openid,profile`                     | Comma-separated OAuth scopes               |
+| `VITE_SIGN_IN_REDIRECT_URL`  | Runtime    | `http://localhost:5173`              | OIDC sign-in redirect URL                  |
+| `VITE_SIGN_OUT_REDIRECT_URL` | Runtime    | `http://localhost:5173`              | OIDC sign-out redirect URL                 |
 
 ### Testing runtime configuration locally
 
 `.env` does not populate `window.configs`. From `portals/`, run
-`./setup-portals.sh`, or create `portals/member-portal/public/config.js`:
+`./setup-portals.sh`, or create `portals/apps/member/public/config.js`:
 
 ```js
 window.configs = {
@@ -86,17 +89,17 @@ window.configs = {
 
 ```bash
 # Run linting
-npm run lint
+pnpm --filter member-portal run lint
 
 # Run unit tests (if configured)
-npm run test
+pnpm --filter member-portal run test
 ```
 
 ## Docker
 
 ```bash
-# Build image
-docker build -t member-portal .
+# Build image (from portals/, the workspace root)
+docker build -t member-portal -f apps/member/Dockerfile .
 
 # Run container
 docker run -p 5173:80 \

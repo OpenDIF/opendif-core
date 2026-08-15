@@ -51,9 +51,10 @@ create_config() {
 # Function to verify portal configuration
 verify_portal() {
     local portal_name=$1
-    local config_path=$2
-    local html_path=$3
-    local port=$4
+    local portal_dir=$2
+    local config_path=$3
+    local html_path=$4
+    local port=$5
     
     echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     echo -e "${BLUE}Verifying ${portal_name}${NC}"
@@ -85,9 +86,9 @@ verify_portal() {
     fi
     
     # Check dependencies
-    if [ ! -d "${portal_name}/node_modules" ]; then
+    if [ ! -d "${portal_dir}/node_modules" ]; then
         echo -e "${YELLOW}⚠ Dependencies not installed${NC}"
-        echo -e "  Run: cd ${portal_name} && npm install"
+        echo -e "  Run: pnpm install (from portals/)"
     else
         echo -e "${GREEN}✓ Dependencies installed${NC}"
     fi
@@ -129,15 +130,15 @@ verify_portal() {
     
     echo ""
     echo -e "${YELLOW}To test this portal:${NC}"
-    echo -e "  cd ${portal_name}"
-    echo -e "  VITE_PORT=${port} npm run dev"
+    echo -e "  cd ${portal_dir}"
+    echo -e "  VITE_PORT=${port} pnpm run dev"
     echo -e "  Open http://localhost:${port}"
     echo -e "  Check browser console for 'Window configs:' log"
     echo ""
 }
 
 # 1. Admin Portal
-ADMIN_CONFIG_PATH="admin-portal/public/config.js"
+ADMIN_CONFIG_PATH="apps/admin/public/config.js"
 ADMIN_CONFIG_CONTENT="window.configs = {
   VITE_API_URL: '${TEST_API_URL}',
   VITE_LOGS_URL: '${TEST_LOGS_URL}',
@@ -150,10 +151,10 @@ ADMIN_CONFIG_CONTENT="window.configs = {
 };"
 
 create_config "Admin Portal" "$ADMIN_CONFIG_PATH" "$ADMIN_CONFIG_CONTENT"
-verify_portal "admin-portal" "$ADMIN_CONFIG_PATH" "admin-portal/index.html" "$(get_portal_port admin-portal)"
+verify_portal "admin-portal" "apps/admin" "$ADMIN_CONFIG_PATH" "apps/admin/index.html" "$(get_portal_port admin-portal)"
 
 # 2. Consent Portal
-CONSENT_CONFIG_PATH="consent-portal/public/config.js"
+CONSENT_CONFIG_PATH="apps/consent/public/config.js"
 CONSENT_CONFIG_CONTENT="window.configs = {
   consentEngineUrl: '${TEST_API_URL}',
   idpClientId: '${TEST_CLIENT_ID}',
@@ -164,10 +165,10 @@ CONSENT_CONFIG_CONTENT="window.configs = {
 };"
 
 create_config "Consent Portal" "$CONSENT_CONFIG_PATH" "$CONSENT_CONFIG_CONTENT"
-verify_portal "consent-portal" "$CONSENT_CONFIG_PATH" "consent-portal/index.html" "$(get_portal_port consent-portal)"
+verify_portal "consent-portal" "apps/consent" "$CONSENT_CONFIG_PATH" "apps/consent/index.html" "$(get_portal_port consent-portal)"
 
 # 3. Member Portal
-MEMBER_CONFIG_PATH="member-portal/public/config.js"
+MEMBER_CONFIG_PATH="apps/member/public/config.js"
 MEMBER_CONFIG_CONTENT="window.configs = {
   API_URL: '${TEST_API_URL}',
   LOGS_URL: '${TEST_LOGS_URL}',
@@ -179,7 +180,7 @@ MEMBER_CONFIG_CONTENT="window.configs = {
 };"
 
 create_config "Member Portal" "$MEMBER_CONFIG_PATH" "$MEMBER_CONFIG_CONTENT"
-verify_portal "member-portal" "$MEMBER_CONFIG_PATH" "member-portal/index.html" "$(get_portal_port member-portal)"
+verify_portal "member-portal" "apps/member" "$MEMBER_CONFIG_PATH" "apps/member/index.html" "$(get_portal_port member-portal)"
 
 # Summary
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
@@ -190,11 +191,11 @@ echo -e "${GREEN}✓ All config.js files created and validated!${NC}\n"
 
 echo -e "${YELLOW}Quick Test Commands:${NC}\n"
 echo -e "${BLUE}# Admin Portal${NC}"
-echo -e "  cd admin-portal && VITE_PORT=5174 npm run dev\n"
+echo -e "  cd apps/admin && VITE_PORT=5174 pnpm run dev\n"
 echo -e "${BLUE}# Consent Portal${NC}"
-echo -e "  cd consent-portal && VITE_PORT=5175 npm run dev\n"
+echo -e "  cd apps/consent && VITE_PORT=5175 pnpm run dev\n"
 echo -e "${BLUE}# Member Portal${NC}"
-echo -e "  cd member-portal && VITE_PORT=5176 npm run dev\n"
+echo -e "  cd apps/member && VITE_PORT=5176 pnpm run dev\n"
 
 echo -e "${YELLOW}Verification Checklist:${NC}"
 echo -e "  [ ] All portals show 'Window configs:' in browser console"

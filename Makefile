@@ -63,9 +63,9 @@ ORCHESTRATION_ENGINE_PATH := exchange/orchestration-engine
 CONSENT_ENGINE_PATH := exchange/consent-engine
 POLICY_DECISION_POINT_PATH := exchange/policy-decision-point
 
-MEMBER_PORTAL_PATH := portals/member-portal
-ADMIN_PORTAL_PATH := portals/admin-portal
-CONSENT_PORTAL_PATH := portals/consent-portal
+MEMBER_PORTAL_PATH := portals/apps/member
+ADMIN_PORTAL_PATH := portals/apps/admin
+CONSENT_PORTAL_PATH := portals/apps/consent
 
 # Go services list
 GO_SERVICES := portal-backend orchestration-engine consent-engine policy-decision-point
@@ -111,7 +111,7 @@ setup-go-service:
 # Setup for Frontend services
 setup-frontend-service:
 	@echo "Setting up Frontend service: $(SERVICE)"
-	@cd $(SERVICE_PATH) && npm ci
+	@cd $(SERVICE_PATH) && pnpm install --frozen-lockfile
 	@echo "✅ Frontend service $(SERVICE) dependencies installed"
 
 # Setup command router
@@ -145,8 +145,8 @@ validate-build-go-service: $(BIN_DIR)
 # Validate build for Frontend services
 validate-build-frontend-service:
 	@echo "Building Frontend service: $(SERVICE)"
-	@cd $(SERVICE_PATH) && npm ci
-	@cd $(SERVICE_PATH) && npm run build
+	@cd $(SERVICE_PATH) && pnpm install --frozen-lockfile
+	@cd $(SERVICE_PATH) && pnpm run build
 	@echo "✅ Frontend service $(SERVICE) built successfully -> $(SERVICE_PATH)/dist/"
 
 # Build validation router
@@ -182,11 +182,11 @@ validate-test-go-service:
 # Validate tests for Frontend services (lint + type check as test equivalent)
 validate-test-frontend-service:
 	@echo "Running tests for Frontend service: $(SERVICE)"
-	@cd $(SERVICE_PATH) && npm ci
+	@cd $(SERVICE_PATH) && pnpm install --frozen-lockfile
 	@echo "Running TypeScript compilation check..."
-	@cd $(SERVICE_PATH) && npx tsc --noEmit || (echo "❌ TypeScript compilation failed for $(SERVICE)" && exit 1)
+	@cd $(SERVICE_PATH) && pnpm exec tsc --noEmit || (echo "❌ TypeScript compilation failed for $(SERVICE)" && exit 1)
 	@echo "Running lint checks..."
-	@cd $(SERVICE_PATH) && npm run lint || (echo "❌ Lint checks failed for $(SERVICE)" && exit 1)
+	@cd $(SERVICE_PATH) && pnpm run lint || (echo "❌ Lint checks failed for $(SERVICE)" && exit 1)
 	@echo "✅ Tests passed for Frontend service $(SERVICE)"
 
 # Test validation router
@@ -343,8 +343,8 @@ check-lint-go-service:
 # Frontend service quality checks
 check-lint-frontend-service:
 	@echo "Running lint checks for Frontend service: $(SERVICE)"
-	@cd $(SERVICE_PATH) && npm ci
-	@cd $(SERVICE_PATH) && npm run lint || (echo "❌ Lint checks failed for $(SERVICE)" && exit 1)
+	@cd $(SERVICE_PATH) && pnpm install --frozen-lockfile
+	@cd $(SERVICE_PATH) && pnpm run lint || (echo "❌ Lint checks failed for $(SERVICE)" && exit 1)
 	@echo "✅ Lint checks passed for Frontend service $(SERVICE)"
 
 # =============================================================================
@@ -443,7 +443,7 @@ run-go-service:
 run-frontend-service:
 	@echo "Running Frontend service: $(SERVICE)"
 	@echo "Service will run in foreground. Press Ctrl+C to stop."
-	@cd $(SERVICE_PATH) && npm run dev
+	@cd $(SERVICE_PATH) && pnpm run dev
 
 # Run router
 run:
@@ -471,7 +471,7 @@ clean:
 	@find . -name "coverage.out" -delete 2>/dev/null || true
 	@find . -name "coverage.html" -delete 2>/dev/null || true
 	@find . -type d -name "node_modules" | while read dir; do rm -rf "$$dir"; done 2>/dev/null || true
-	@rm -rf portals/member-portal/dist portals/admin-portal/dist portals/consent-portal/dist 2>/dev/null || true
+	@rm -rf portals/apps/member/dist portals/apps/admin/dist portals/apps/consent/dist 2>/dev/null || true
 	@echo "✅ All build artifacts cleaned"
 
 # Allow service names to be used as targets (ignore them)

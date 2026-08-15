@@ -110,18 +110,18 @@ jobs:
             image: orchestration-engine
             description: Orchestration Engine service for coordinating data exchange workflows
           - name: admin-portal
-            context: ./portals/admin-portal
-            dockerfile: ./portals/admin-portal/Dockerfile
+            context: ./portals
+            dockerfile: ./portals/apps/admin/Dockerfile
             image: admin-portal
             description: Admin Portal for the Data Exchange platform
           - name: consent-portal
-            context: ./portals/consent-portal
-            dockerfile: ./portals/consent-portal/Dockerfile
+            context: ./portals
+            dockerfile: ./portals/apps/consent/Dockerfile
             image: consent-portal
             description: Consent Portal for the Data Exchange platform
           - name: member-portal
-            context: ./portals/member-portal
-            dockerfile: ./portals/member-portal/Dockerfile
+            context: ./portals
+            dockerfile: ./portals/apps/member/Dockerfile
             image: member-portal
             description: Member Portal for the Data Exchange platform
 

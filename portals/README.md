@@ -1,12 +1,31 @@
 # Portals
 
-React-based portals for the OpenNDX platform.
+React-based portals for the OpenNDX platform, managed as a pnpm workspace.
 
-## Portals
+## Structure
 
-- **Admin Portal** - Administrative interface for managing the platform
-- **Consent Portal** - User-facing consent management interface
-- **Member Portal** - Management of `Data sources` or `Applications` by members
+```
+portals/
+├── apps/
+│   ├── admin/      # Admin Portal - administrative interface for managing the platform
+│   ├── consent/    # Consent Portal - user-facing consent management interface
+│   └── member/     # Member Portal - management of Data sources / Applications by members
+├── packages/       # Shared code used across the portals in apps/ (empty for now)
+├── package.json
+└── pnpm-workspace.yaml
+```
+
+## Prerequisites
+
+- [pnpm](https://pnpm.io/installation) 9+
+- Node.js 24+
+
+Install workspace dependencies once from `portals/`:
+
+```bash
+cd portals
+pnpm install
+```
 
 ## Configuration (`config.js`)
 
@@ -18,11 +37,11 @@ Each portal relies on a `config.js` file for runtime configuration. This file is
 
 ### Locations & Variables
 
-| Portal | Config Path | Required Variables |
-|--------|------------|-------------------|
-| **Admin** | `admin-portal/public/config.js` | `VITE_API_URL`, `VITE_LOGS_URL`, `VITE_IDP_CLIENT_ID`, `VITE_IDP_BASE_URL`, ... |
-| **Consent** | `consent-portal/public/config.js` | `apiUrl`, `VITE_CLIENT_ID`, `VITE_BASE_URL`, `VITE_SCOPE`, ... |
-| **Member** | `member-portal/public/config.js` | `apiUrl`, `logsUrl`, `VITE_CLIENT_ID`, `VITE_BASE_URL`, ... |
+| Portal      | Config Path                     | Required Variables                                                              |
+|-------------|---------------------------------|---------------------------------------------------------------------------------|
+| **Admin**   | `apps/admin/public/config.js`   | `VITE_API_URL`, `VITE_LOGS_URL`, `VITE_IDP_CLIENT_ID`, `VITE_IDP_BASE_URL`, ... |
+| **Consent** | `apps/consent/public/config.js` | `apiUrl`, `VITE_CLIENT_ID`, `VITE_BASE_URL`, `VITE_SCOPE`, ...                  |
+| **Member**  | `apps/member/public/config.js`  | `apiUrl`, `logsUrl`, `VITE_CLIENT_ID`, `VITE_BASE_URL`, ...                     |
 
 ## Local Development Setup
 
@@ -39,9 +58,8 @@ This script creates the files, validates dependencies, and ensures correct HTML 
 
 ### 1. Start a Portal
 ```bash
-# Example: Admin Portal
-cd admin-portal
-VITE_PORT=5174 npm run dev
+# Example: Admin Portal, from portals/
+pnpm --filter admin-portal run dev -- --port 5174
 ```
 
 ### 2. Verify Configuration Loading

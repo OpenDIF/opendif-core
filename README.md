@@ -74,7 +74,7 @@ This command will:
    - consent-engine
    - portal-backend
 
-3. **Setup Frontend Services** - Installs npm dependencies (`npm ci`) for:
+3. **Setup Frontend Services** - Installs pnpm dependencies (`pnpm install --frozen-lockfile`) for:
    - member-portal
    - admin-portal
    - consent-portal

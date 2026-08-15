@@ -19,24 +19,27 @@ The Consent Portal is the interface where citizens (data owners) interact with O
 
 ### Prerequisites
 
-- Node.js 18+
-- npm 9+
+- Node.js 24+
+- pnpm 9+
+
+This app is part of the `portals/` pnpm workspace — dependencies are
+installed once from `portals/`, not from within this directory.
 
 ### Run the Application
 
 ```bash
-# Install dependencies
-npm install
+# From portals/: install dependencies for the whole workspace
+pnpm install
 
 # Create your runtime config (see Configuration below)
-cp public/config.example.js public/config.js
+cp apps/consent/public/config.example.js apps/consent/public/config.js
 
-# Run in development mode
-npm run dev
+# Run this app in development mode
+pnpm --filter consent-portal run dev
 ```
 
 The application will be available at `http://localhost:5173`. To use a different
-port, pass it to Vite: `npm run dev -- --port 5180`.
+port, pass it to Vite: `pnpm --filter consent-portal run dev -- --port 5180`.
 
 ## Configuration
 
