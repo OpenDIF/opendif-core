@@ -24,19 +24,19 @@ Go to **Actions** → **Release - Build and Publish All Services** → **Run wor
 
 ## Artifacts
 
-All images are published to **ghcr.io/openndx/openndx-core/**:
+All images are published to **ghcr.io/openndx/** (previously `ghcr.io/openndx/openndx-core/`; existing tags under the old path remain available but are no longer updated):
 
-| Category | Service | Image Name |
-| :--- | :--- | :--- |
-| **Backend** | Portal Backend | `portal-backend` |
-| | Policy Decision Point | `policy-decision-point` |
-| | Consent Engine | `consent-engine` |
-| | Orchestration Engine | `orchestration-engine` |
-| **Frontend** | Admin Portal | `admin-portal` |
-| | Consent Portal | `consent-portal` |
-| | Member Portal | `member-portal` |
+| Category     | Service               | Image Name              |
+|:-------------|:----------------------|:------------------------|
+| **Backend**  | Portal Backend        | `portal-backend`        |
+|              | Policy Decision Point | `policy-decision-point` |
+|              | Consent Engine        | `consent-engine`        |
+|              | Orchestration Engine  | `orchestration-engine`  |
+| **Frontend** | Admin Portal          | `admin-portal`          |
+|              | Consent Portal        | `consent-portal`        |
+|              | Member Portal         | `member-portal`         |
 
 ## Verification
 ```bash
-docker pull ghcr.io/openndx/openndx-core/portal-backend:v1.0.0
+docker pull ghcr.io/openndx/portal-backend:v1.0.0
 ```
