@@ -6,9 +6,9 @@ bin/
 **/dist/
 
 # Frontend build artifacts
-portals/member-portal/public/config.js
-portals/admin-portal/public/config.js
-portals/consent-portal/public/config.js
+portals/apps/member/public/config.js
+portals/apps/admin/public/config.js
+portals/apps/consent/public/config.js
 
 # Test coverage files
 **/coverage.out

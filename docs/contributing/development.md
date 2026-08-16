@@ -32,7 +32,7 @@ Before you begin, ensure you have the following installed:
     This will:
     - Install Git hooks (pre-commit checks)
     - Install Go dependencies for all services
-    - Install npm dependencies for all frontend portals
+    - Install pnpm dependencies for all frontend portals
 
 ## Development Workflow
 
@@ -127,10 +127,12 @@ openndx-core/
 │   ├── policy-decision-point/
 │   ├── consent-engine/
 │   └── ...
-├── portals/               # Frontend React applications
-│   ├── member-portal/
-│   ├── admin-portal/
-│   └── consent-portal/
+├── portals/               # Frontend React applications (pnpm workspace)
+│   ├── apps/
+│   │   ├── member/
+│   │   ├── admin/
+│   │   └── consent/
+│   └── packages/          # Shared code used across the portals
 ├── tests/                 # Integration tests
 │   └── integration/
 └── docs/                  # Documentation

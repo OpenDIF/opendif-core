@@ -5,7 +5,10 @@ on:
         branches:
             - main
         paths:
-            - "portals/consent-portal/**"
+            - "portals/apps/consent/**"
+            - "portals/package.json"
+            - "portals/pnpm-workspace.yaml"
+            - "portals/pnpm-lock.yaml"
             - ".github/workflows/consent-portal-publish.yml"
     workflow_dispatch:
 
@@ -49,7 +52,8 @@ jobs:
             - name: Build and push Docker image
               uses: docker/build-push-action@v5
               with:
-                  context: portals/consent-portal
+                  context: portals
+                  file: portals/apps/consent/Dockerfile
                   push: true
                   tags: ${{ steps.meta.outputs.tags }}
                   labels: ${{ steps.meta.outputs.labels }}
