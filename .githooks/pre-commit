@@ -21,7 +21,7 @@ get_service_path() {
     case "$1" in
         portal-backend) echo "portal-backend" ;;
         orchestration-engine) echo "exchange/orchestration-engine" ;;
-        consent-engine) echo "exchange/consent-engine" ;;
+        consent-engine) echo "cmd/ce internal/ce" ;;
         policy-decision-point) echo "exchange/policy-decision-point" ;;
         member-portal) echo "portals/apps/member" ;;
         admin-portal) echo "portals/apps/admin" ;;
@@ -49,16 +49,21 @@ echo ""
 AFFECTED_SERVICES=""
 
 for service in $ALL_SERVICES; do
-    path=$(get_service_path "$service")
-    if [ -n "$path" ]; then
-        # Check if any staged file belongs to this service
-        if echo "$STAGED_FILES" | grep -q "^${path}/"; then
-            if [ -z "$AFFECTED_SERVICES" ]; then
-                AFFECTED_SERVICES="$service"
-            else
-                AFFECTED_SERVICES="$AFFECTED_SERVICES $service"
+    paths=$(get_service_path "$service")
+    if [ -n "$paths" ]; then
+        # A service may map to more than one path (e.g. consent-engine
+        # spans cmd/ce and internal/ce). Check if any staged file
+        # belongs to any of them.
+        for path in $paths; do
+            if echo "$STAGED_FILES" | grep -q "^${path}/"; then
+                if [ -z "$AFFECTED_SERVICES" ]; then
+                    AFFECTED_SERVICES="$service"
+                else
+                    AFFECTED_SERVICES="$AFFECTED_SERVICES $service"
+                fi
+                break
             fi
-        fi
+        done
     fi
 done
 
