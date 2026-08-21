@@ -7,7 +7,14 @@ on:
       - "tests/integration/**"
       - "exchange/orchestration-engine/**"
       - "exchange/policy-decision-point/**"
-      - "exchange/consent-engine/**"
+      - "cmd/ce/**"
+      - "internal/ce/**"
+      - "internal/config/**"
+      - "internal/constants/**"
+      - "internal/monitoring/**"
+      - "internal/utils/**"
+      - "go.mod"
+      - "go.sum"
       - "exchange/shared/**"
       - "shared/**"
       - ".github/workflows/integration-tests.yml"
@@ -18,7 +25,14 @@ on:
       - "tests/integration/**"
       - "exchange/orchestration-engine/**"
       - "exchange/policy-decision-point/**"
-      - "exchange/consent-engine/**"
+      - "cmd/ce/**"
+      - "internal/ce/**"
+      - "internal/config/**"
+      - "internal/constants/**"
+      - "internal/monitoring/**"
+      - "internal/utils/**"
+      - "go.mod"
+      - "go.sum"
       - "exchange/shared/**"
       - "shared/**"
       - ".github/workflows/integration-tests.yml"
@@ -30,7 +44,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  GO_VERSION: "1.24"
+  GO_VERSION: "1.26"
   TEST_TIMEOUT: 30m
 
 jobs:
@@ -98,7 +112,7 @@ jobs:
 
           # Build Consent Engine
           echo "Building Consent Engine..."
-          (cd exchange/consent-engine && go build -o ../../tests/integration/bin/consent-engine .) &
+          go build -o tests/integration/bin/consent-engine ./cmd/ce &
 
           # Build Orchestration Engine
           echo "Building Orchestration Engine..."

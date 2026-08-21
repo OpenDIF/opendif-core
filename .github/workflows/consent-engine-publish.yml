@@ -5,15 +5,21 @@ on:
     branches:
       - main
     paths:
-      - "exchange/consent-engine/**"
-      - "exchange/shared/**"
-      - "shared/**"
+      - "cmd/ce/**"
+      - "internal/ce/**"
+      - "internal/config/**"
+      - "internal/constants/**"
+      - "internal/monitoring/**"
+      - "internal/utils/**"
+      - "go.mod"
+      - "go.sum"
+      - ".dockerignore"
       - ".github/workflows/consent-engine-publish.yml"
   workflow_dispatch:
 
 env:
   # === Service-specific variables ===
-  SERVICE_PATH: "exchange/consent-engine"
+  SERVICE_PATH: "cmd/ce"
   IMAGE_NAME: ${{ github.repository_owner }}/consent-engine
   # ================================
   REGISTRY: ghcr.io
@@ -58,7 +64,7 @@ jobs:
         id: build-push
         uses: docker/build-push-action@v5
         with:
-          context: ${{ env.SERVICE_PATH }}
+          context: .
           file: ${{ env.SERVICE_PATH }}/Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}

@@ -24,7 +24,7 @@ cd ../tests/integration && docker compose -f docker-compose.test.yml up -d && go
 | Service                         | Port | Purpose                          | Documentation                                 |
 |---------------------------------|------|----------------------------------|-----------------------------------------------|
 | **Policy Decision Point (PDP)** | 8082 | ABAC authorization using OPA     | [PDP README](policy-decision-point/README.md) |
-| **Consent Engine (CE)**         | 8081 | Consent management and workflow  | [CE README](consent-engine/README.md)         |
+| **Consent Engine (CE)**         | 8081 | Consent management and workflow  | [CE README](../cmd/ce/README.md)              |
 | **Orchestration Engine (OE)**   | 8080 | Request coordination and routing | [OE README](orchestration-engine/README.md)   |
 
 ## Architecture
@@ -209,8 +209,8 @@ docker compose up --build
 # Policy Decision Point
 cd policy-decision-point && go test -v
 
-# Consent Engine
-cd consent-engine && go test -v
+# Consent Engine (now part of the root Go module — run from the repo root)
+cd ../.. && go test ./cmd/ce/... ./internal/ce/... -v
 ```
 
 #### Integration Tests
@@ -285,18 +285,21 @@ Copy `.env.example` to `.env` and adjust for your environment:
 ```
 exchange/
 ├── policy-decision-point/    # Policy service (Port 8082)
-├── consent-engine/           # Consent service (Port 8081)
 ├── orchestration-engine/  # Orchestration service (Port 8080)
 ├── shared/                   # Shared utilities and packages
 ├── scripts/                  # Management scripts
 ├── docker-compose.yml        # Multi-environment orchestration
 └── Makefile                  # Convenience commands
+
+# Consent Engine (CE) now lives in the root Go module, not under exchange/:
+cmd/ce/                       # Consent service entrypoint, Dockerfile, migrations (Port 8081)
+internal/ce/                  # Consent service implementation
 ```
 
 ## Related Documentation
 
 - [Policy Decision Point README](policy-decision-point/README.md)
-- [Consent Engine README](consent-engine/README.md)
+- [Consent Engine README](../cmd/ce/README.md)
 - [Orchestration Engine README](orchestration-engine/README.md)
 - [Integration Tests README](../tests/integration/README.md)
 - [Scripts README](scripts/README.md)

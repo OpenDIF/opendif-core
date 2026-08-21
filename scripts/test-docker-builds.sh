@@ -71,7 +71,7 @@ fi
 echo ""
 
 # Build consent-engine
-if ! build_service "consent-engine" "exchange/consent-engine/Dockerfile" "exchange/consent-engine"; then
+if ! build_service "consent-engine" "cmd/ce/Dockerfile" "cmd/ce"; then
     OVERALL_STATUS=1
 fi
 echo ""
