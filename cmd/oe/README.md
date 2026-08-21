@@ -49,9 +49,8 @@ To set up the development environment for the Orchestration Engine, follow these
    official [Go website](https://golang.org/dl/).
 2. **GraphQL Specification**: The Orchestration Engine uses GraphQL for its API. Familiarize yourself with the GraphQL
    specification by visiting the [GraphQL official site](https://graphql.org/).
-3. **`schema.graphql` Schema File**: The GraphQL schema file is currently located in the `schemas` directory. These
-   files define the structure of the API and the types of data that can be queried.
-   We have placed the sample schema in it.
+3. **`schema.graphql` Schema File**: The GraphQL schema file lives at `cmd/oe/schema.graphql`. It defines the
+   structure of the API and the types of data that can be queried. We have placed the sample schema in it.
    - It should include `@sourceInfo` the directives in each of its leaf fields along with the following fields.
      - `providerKey` - A unique identifier for the data provider.
      - `providerField` - The field name in the provider's schema that corresponds to this field.
@@ -69,9 +68,9 @@ To set up the development environment for the Orchestration Engine, follow these
      - `validAudiences` - Array of valid audience values
      - `jwksUrl` - JWKS endpoint URL for public key retrieval (e.g., `https://idp.example.com/oauth2/jwks`)
 
-5. **Run the Server**: You can run the Orchestration Engine server using the following command:
+5. **Run the Server**: Orchestration Engine is part of the root Go module — from the repository root, run:
    ```bash
-   go run main.go
+   go run ./cmd/oe
    ```
    The server will start and listen for incoming requests on port 4000 (configurable via `PORT` environment variable).
 

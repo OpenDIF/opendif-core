@@ -1,11 +1,6 @@
 # Build stage
 FROM golang:1.26-alpine AS builder
 
-# Build arguments
-ARG BUILD_VERSION=latest
-ARG BUILD_TIME
-ARG GIT_COMMIT
-
 # Install build dependencies
 RUN apk add --no-cache git ca-certificates
 

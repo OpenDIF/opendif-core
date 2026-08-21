@@ -30,7 +30,7 @@ Run only when Dockerfiles are modified. Optimizes CI time by skipping Docker bui
 | Workflow                                    | Triggers On                                            |
 |---------------------------------------------|--------------------------------------------------------|
 | `consent-engine-docker-validate.yml`        | Changes to `cmd/ce/Dockerfile`                         |
-| `orchestration-engine-docker-validate.yml`  | Changes to `exchange/orchestration-engine/Dockerfile`  |
+| `orchestration-engine-docker-validate.yml`  | Changes to `cmd/oe/Dockerfile`                         |
 | `policy-decision-point-docker-validate.yml` | Changes to `exchange/policy-decision-point/Dockerfile` |
 | `portal-backend-docker-validate.yml`        | Changes to `portal-backend/Dockerfile`                 |
 
