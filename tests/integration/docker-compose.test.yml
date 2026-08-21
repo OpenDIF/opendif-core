@@ -77,8 +77,8 @@ services:
   # Orchestration Engine Service
   orchestration-engine:
     build:
-      context: ../../exchange/orchestration-engine
-      dockerfile: Dockerfile
+      context: ../..
+      dockerfile: cmd/oe/Dockerfile
     environment:
       PORT: 4000
       LOG_LEVEL: info
