@@ -83,7 +83,7 @@ fi
 echo ""
 
 # Build portal-backend
-if ! build_service "portal-backend" "portal-backend/Dockerfile" "portal-backend"; then
+if ! build_service "portal-backend" "cmd/pb/Dockerfile" "cmd/pb"; then
     OVERALL_STATUS=1
 fi
 echo ""

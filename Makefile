@@ -58,13 +58,13 @@ BUILD_TIME := $(shell date -u '+%Y-%m-%d_%H:%M:%S')
 GIT_COMMIT := $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 
 # Service paths
-portal_backend_PATH := portal-backend
 
-# Consent Engine, Orchestration Engine, and Policy Decision Point are part of
-# the root Go module (see go.mod): their binary entrypoints live under
-# cmd/<svc>, their implementation under internal/<svc>. Because they aren't
-# self-contained module directories like the services above, they use the
-# *-go-rootmod-service targets below instead of *-go-service.
+# Consent Engine, Orchestration Engine, Policy Decision Point, and Portal
+# Backend are part of the root Go module (see go.mod): their binary
+# entrypoints live under cmd/<svc>, their implementation under internal/<svc>.
+# Because they aren't self-contained module directories like the services
+# above, they use the *-go-rootmod-service targets below instead of
+# *-go-service.
 CONSENT_ENGINE_PATH := cmd/ce
 CONSENT_ENGINE_INTERNAL_PATH := internal/ce
 CONSENT_ENGINE_TEST_PATH := ./cmd/ce/... ./internal/ce/...
@@ -79,6 +79,11 @@ POLICY_DECISION_POINT_PATH := cmd/pdp
 POLICY_DECISION_POINT_INTERNAL_PATH := internal/pdp
 POLICY_DECISION_POINT_TEST_PATH := ./cmd/pdp/... ./internal/pdp/...
 POLICY_DECISION_POINT_DOCKERFILE := cmd/pdp/Dockerfile
+
+portal_backend_PATH := cmd/pb
+PORTAL_BACKEND_INTERNAL_PATH := internal/pb
+PORTAL_BACKEND_TEST_PATH := ./cmd/pb/... ./internal/pb/...
+PORTAL_BACKEND_DOCKERFILE := cmd/pb/Dockerfile
 
 MEMBER_PORTAL_PATH := portals/apps/member
 ADMIN_PORTAL_PATH := portals/apps/admin
@@ -222,7 +227,7 @@ validate-test-frontend-service:
 validate-test:
 	@SERVICE_NAME="$(word 2,$(MAKECMDGOALS))"; \
 	case "$$SERVICE_NAME" in \
-		portal-backend) SERVICE_PATH="$(portal_backend_PATH)"; TARGET="validate-test-go-service" ;; \
+		portal-backend) SERVICE_PATH="$(portal_backend_PATH)"; SERVICE_TEST_PATH="$(PORTAL_BACKEND_TEST_PATH)"; TARGET="validate-test-go-rootmod-service" ;; \
 		orchestration-engine) SERVICE_PATH="$(ORCHESTRATION_ENGINE_PATH)"; SERVICE_TEST_PATH="$(ORCHESTRATION_ENGINE_TEST_PATH)"; TARGET="validate-test-go-rootmod-service" ;; \
 		consent-engine) SERVICE_PATH="$(CONSENT_ENGINE_PATH)"; SERVICE_TEST_PATH="$(CONSENT_ENGINE_TEST_PATH)"; TARGET="validate-test-go-rootmod-service" ;; \
 		policy-decision-point) SERVICE_PATH="$(POLICY_DECISION_POINT_PATH)"; SERVICE_TEST_PATH="$(POLICY_DECISION_POINT_TEST_PATH)"; TARGET="validate-test-go-rootmod-service" ;; \
@@ -264,7 +269,7 @@ validate-docker-build-rootmod-service:
 validate-docker-build:
 	@SERVICE_NAME="$(word 2,$(MAKECMDGOALS))"; \
 	case "$$SERVICE_NAME" in \
-		portal-backend) SERVICE_PATH="$(portal_backend_PATH)"; TARGET="validate-docker-build-service" ;; \
+		portal-backend) SERVICE_DOCKERFILE="$(PORTAL_BACKEND_DOCKERFILE)"; TARGET="validate-docker-build-rootmod-service" ;; \
 		orchestration-engine) SERVICE_DOCKERFILE="$(ORCHESTRATION_ENGINE_DOCKERFILE)"; TARGET="validate-docker-build-rootmod-service" ;; \
 		consent-engine) SERVICE_DOCKERFILE="$(CONSENT_ENGINE_DOCKERFILE)"; TARGET="validate-docker-build-rootmod-service" ;; \
 		policy-decision-point) SERVICE_DOCKERFILE="$(POLICY_DECISION_POINT_DOCKERFILE)"; TARGET="validate-docker-build-rootmod-service" ;; \
@@ -473,7 +478,7 @@ check-lint-frontend-service:
 format:
 	@SERVICE_NAME="$(word 2,$(MAKECMDGOALS))"; \
 	case "$$SERVICE_NAME" in \
-		portal-backend) SERVICE_PATH="$(portal_backend_PATH)"; TARGET="format-go-service" ;; \
+		portal-backend) SERVICE_PATH="$(portal_backend_PATH)"; SERVICE_INTERNAL_PATH="$(PORTAL_BACKEND_INTERNAL_PATH)"; TARGET="format-go-rootmod-service" ;; \
 		orchestration-engine) SERVICE_PATH="$(ORCHESTRATION_ENGINE_PATH)"; SERVICE_INTERNAL_PATH="$(ORCHESTRATION_ENGINE_INTERNAL_PATH)"; TARGET="format-go-rootmod-service" ;; \
 		consent-engine) SERVICE_PATH="$(CONSENT_ENGINE_PATH)"; SERVICE_INTERNAL_PATH="$(CONSENT_ENGINE_INTERNAL_PATH)"; TARGET="format-go-rootmod-service" ;; \
 		policy-decision-point) SERVICE_PATH="$(POLICY_DECISION_POINT_PATH)"; SERVICE_INTERNAL_PATH="$(POLICY_DECISION_POINT_INTERNAL_PATH)"; TARGET="format-go-rootmod-service" ;; \
@@ -485,7 +490,7 @@ format:
 lint:
 	@SERVICE_NAME="$(word 2,$(MAKECMDGOALS))"; \
 	case "$$SERVICE_NAME" in \
-		portal-backend) SERVICE_PATH="$(portal_backend_PATH)"; TARGET="lint-go-service" ;; \
+		portal-backend) SERVICE_PATH="$(portal_backend_PATH)"; SERVICE_INTERNAL_PATH="$(PORTAL_BACKEND_INTERNAL_PATH)"; SERVICE_TEST_PATH="$(PORTAL_BACKEND_TEST_PATH)"; TARGET="lint-go-rootmod-service" ;; \
 		orchestration-engine) SERVICE_PATH="$(ORCHESTRATION_ENGINE_PATH)"; SERVICE_INTERNAL_PATH="$(ORCHESTRATION_ENGINE_INTERNAL_PATH)"; SERVICE_TEST_PATH="$(ORCHESTRATION_ENGINE_TEST_PATH)"; TARGET="lint-go-rootmod-service" ;; \
 		consent-engine) SERVICE_PATH="$(CONSENT_ENGINE_PATH)"; SERVICE_INTERNAL_PATH="$(CONSENT_ENGINE_INTERNAL_PATH)"; SERVICE_TEST_PATH="$(CONSENT_ENGINE_TEST_PATH)"; TARGET="lint-go-rootmod-service" ;; \
 		policy-decision-point) SERVICE_PATH="$(POLICY_DECISION_POINT_PATH)"; SERVICE_INTERNAL_PATH="$(POLICY_DECISION_POINT_INTERNAL_PATH)"; SERVICE_TEST_PATH="$(POLICY_DECISION_POINT_TEST_PATH)"; TARGET="lint-go-rootmod-service" ;; \
@@ -497,7 +502,7 @@ lint:
 staticcheck:
 	@SERVICE_NAME="$(word 2,$(MAKECMDGOALS))"; \
 	case "$$SERVICE_NAME" in \
-		portal-backend) SERVICE_PATH="$(portal_backend_PATH)"; TARGET="staticcheck-go-service" ;; \
+		portal-backend) SERVICE_PATH="$(portal_backend_PATH)"; SERVICE_TEST_PATH="$(PORTAL_BACKEND_TEST_PATH)"; TARGET="staticcheck-go-rootmod-service" ;; \
 		orchestration-engine) SERVICE_PATH="$(ORCHESTRATION_ENGINE_PATH)"; SERVICE_TEST_PATH="$(ORCHESTRATION_ENGINE_TEST_PATH)"; TARGET="staticcheck-go-rootmod-service" ;; \
 		consent-engine) SERVICE_PATH="$(CONSENT_ENGINE_PATH)"; SERVICE_TEST_PATH="$(CONSENT_ENGINE_TEST_PATH)"; TARGET="staticcheck-go-rootmod-service" ;; \
 		policy-decision-point) SERVICE_PATH="$(POLICY_DECISION_POINT_PATH)"; SERVICE_TEST_PATH="$(POLICY_DECISION_POINT_TEST_PATH)"; TARGET="staticcheck-go-rootmod-service" ;; \
@@ -509,7 +514,7 @@ staticcheck:
 security:
 	@SERVICE_NAME="$(word 2,$(MAKECMDGOALS))"; \
 	case "$$SERVICE_NAME" in \
-		portal-backend) SERVICE_PATH="$(portal_backend_PATH)"; TARGET="security-go-service" ;; \
+		portal-backend) SERVICE_PATH="$(portal_backend_PATH)"; SERVICE_TEST_PATH="$(PORTAL_BACKEND_TEST_PATH)"; TARGET="security-go-rootmod-service" ;; \
 		orchestration-engine) SERVICE_PATH="$(ORCHESTRATION_ENGINE_PATH)"; SERVICE_TEST_PATH="$(ORCHESTRATION_ENGINE_TEST_PATH)"; TARGET="security-go-rootmod-service" ;; \
 		consent-engine) SERVICE_PATH="$(CONSENT_ENGINE_PATH)"; SERVICE_TEST_PATH="$(CONSENT_ENGINE_TEST_PATH)"; TARGET="security-go-rootmod-service" ;; \
 		policy-decision-point) SERVICE_PATH="$(POLICY_DECISION_POINT_PATH)"; SERVICE_TEST_PATH="$(POLICY_DECISION_POINT_TEST_PATH)"; TARGET="security-go-rootmod-service" ;; \
@@ -521,7 +526,7 @@ security:
 quality-check:
 	@SERVICE_NAME="$(word 2,$(MAKECMDGOALS))"; \
 	case "$$SERVICE_NAME" in \
-		portal-backend) SERVICE_PATH="$(portal_backend_PATH)"; TARGET="quality-check-go-service" ;; \
+		portal-backend) SERVICE_PATH="$(portal_backend_PATH)"; SERVICE_INTERNAL_PATH="$(PORTAL_BACKEND_INTERNAL_PATH)"; SERVICE_TEST_PATH="$(PORTAL_BACKEND_TEST_PATH)"; TARGET="quality-check-go-rootmod-service" ;; \
 		orchestration-engine) SERVICE_PATH="$(ORCHESTRATION_ENGINE_PATH)"; SERVICE_INTERNAL_PATH="$(ORCHESTRATION_ENGINE_INTERNAL_PATH)"; SERVICE_TEST_PATH="$(ORCHESTRATION_ENGINE_TEST_PATH)"; TARGET="quality-check-go-rootmod-service" ;; \
 		consent-engine) SERVICE_PATH="$(CONSENT_ENGINE_PATH)"; SERVICE_INTERNAL_PATH="$(CONSENT_ENGINE_INTERNAL_PATH)"; SERVICE_TEST_PATH="$(CONSENT_ENGINE_TEST_PATH)"; TARGET="quality-check-go-rootmod-service" ;; \
 		policy-decision-point) SERVICE_PATH="$(POLICY_DECISION_POINT_PATH)"; SERVICE_INTERNAL_PATH="$(POLICY_DECISION_POINT_INTERNAL_PATH)"; SERVICE_TEST_PATH="$(POLICY_DECISION_POINT_TEST_PATH)"; TARGET="quality-check-go-rootmod-service" ;; \
@@ -536,7 +541,7 @@ quality-check:
 check-lint:
 	@SERVICE_NAME="$(word 2,$(MAKECMDGOALS))"; \
 	case "$$SERVICE_NAME" in \
-		portal-backend) SERVICE_PATH="$(portal_backend_PATH)"; TARGET="check-lint-go-service" ;; \
+		portal-backend) SERVICE_PATH="$(portal_backend_PATH)"; SERVICE_INTERNAL_PATH="$(PORTAL_BACKEND_INTERNAL_PATH)"; SERVICE_TEST_PATH="$(PORTAL_BACKEND_TEST_PATH)"; TARGET="check-lint-go-rootmod-service" ;; \
 		orchestration-engine) SERVICE_PATH="$(ORCHESTRATION_ENGINE_PATH)"; SERVICE_INTERNAL_PATH="$(ORCHESTRATION_ENGINE_INTERNAL_PATH)"; SERVICE_TEST_PATH="$(ORCHESTRATION_ENGINE_TEST_PATH)"; TARGET="check-lint-go-rootmod-service" ;; \
 		consent-engine) SERVICE_PATH="$(CONSENT_ENGINE_PATH)"; SERVICE_INTERNAL_PATH="$(CONSENT_ENGINE_INTERNAL_PATH)"; SERVICE_TEST_PATH="$(CONSENT_ENGINE_TEST_PATH)"; TARGET="check-lint-go-rootmod-service" ;; \
 		policy-decision-point) SERVICE_PATH="$(POLICY_DECISION_POINT_PATH)"; SERVICE_INTERNAL_PATH="$(POLICY_DECISION_POINT_INTERNAL_PATH)"; SERVICE_TEST_PATH="$(POLICY_DECISION_POINT_TEST_PATH)"; TARGET="check-lint-go-rootmod-service" ;; \

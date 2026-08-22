@@ -91,7 +91,7 @@ jobs:
         service:
           - name: portal-backend
             context: .
-            dockerfile: ./portal-backend/Dockerfile
+            dockerfile: ./cmd/pb/Dockerfile
             image: portal-backend
             description: Portal Backend service for the Data Exchange platform
           - name: policy-decision-point
