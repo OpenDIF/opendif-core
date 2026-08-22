@@ -6,8 +6,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/OpenNDX/openndx-core/exchange/policy-decision-point/internal/config"
-	"github.com/OpenNDX/openndx-core/exchange/policy-decision-point/internal/models"
+	"github.com/openndx/openndx-core/internal/pdp/config"
+	"github.com/openndx/openndx-core/internal/pdp/models"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"

@@ -1,5 +1,5 @@
 # Multi-stage Dockerfile for Policy Decision Point
-FROM golang:1.25-alpine AS builder
+FROM golang:1.26-alpine AS builder
 
 WORKDIR /app
 
@@ -13,8 +13,6 @@ RUN apk add --no-cache git ca-certificates tzdata
 
 # Copy go mod files first for better layer caching
 COPY go.mod go.sum ./
-# Shared modules (github.com/OpenNDX/openndx-core/...) are now published and
-# fetched from the module proxy, so no local shared source needs to be copied.
 RUN go mod download
 
 # Copy source code (this layer is invalidated only on code changes)
@@ -23,7 +21,7 @@ COPY . .
 # Build the application with build info
 RUN CGO_ENABLED=0 GOOS=linux go build \
     -ldflags="-w -s -X main.Version=${BUILD_VERSION} -X main.BuildTime=${BUILD_TIME} -X main.GitCommit=${GIT_COMMIT}" \
-    -o /app/pdp .
+    -o /app/pdp ./cmd/pdp
 
 # Final stage
 FROM alpine:3.17

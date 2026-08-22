@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/OpenNDX/openndx-core/exchange/policy-decision-point/internal/models"
 	"github.com/google/uuid"
+	"github.com/openndx/openndx-core/internal/pdp/models"
 	"gorm.io/gorm"
 )
 

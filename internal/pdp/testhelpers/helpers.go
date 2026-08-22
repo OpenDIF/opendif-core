@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/OpenNDX/openndx-core/exchange/policy-decision-point/internal/models"
+	"github.com/openndx/openndx-core/internal/pdp/models"
 	"gorm.io/driver/postgres"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"

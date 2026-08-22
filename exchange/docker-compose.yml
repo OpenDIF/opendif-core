@@ -36,8 +36,8 @@ services:
 
   policy-decision-point:
     build:
-      context: ./policy-decision-point
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: cmd/pdp/Dockerfile
       args:
         BUILD_VERSION: ${BUILD_VERSION:-dev}
         BUILD_TIME: ${BUILD_TIME:-2025-09-09T16:30:00Z}

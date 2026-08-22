@@ -5,9 +5,9 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/OpenNDX/openndx-core/exchange/policy-decision-point/internal/models"
-	"github.com/OpenNDX/openndx-core/exchange/policy-decision-point/internal/services"
-	"github.com/OpenNDX/openndx-core/exchange/shared/utils"
+	"github.com/openndx/openndx-core/internal/pdp/models"
+	"github.com/openndx/openndx-core/internal/pdp/services"
+	"github.com/openndx/openndx-core/internal/utils"
 	"gorm.io/gorm"
 )
 

@@ -4,8 +4,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/OpenNDX/openndx-core/exchange/policy-decision-point/internal/models"
-	"github.com/OpenNDX/openndx-core/exchange/policy-decision-point/internal/testhelpers"
+	"github.com/openndx/openndx-core/internal/pdp/models"
+	"github.com/openndx/openndx-core/internal/pdp/testhelpers"
 	"github.com/stretchr/testify/assert"
 	"gorm.io/gorm"
 )
