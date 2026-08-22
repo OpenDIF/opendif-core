@@ -25,7 +25,7 @@ cd ../tests/integration && docker compose -f docker-compose.test.yml up -d && go
 |---------------------------------|------|----------------------------------|-----------------------------------------------|
 | **Policy Decision Point (PDP)** | 8082 | ABAC authorization using OPA     | [PDP README](policy-decision-point/README.md) |
 | **Consent Engine (CE)**         | 8081 | Consent management and workflow  | [CE README](../cmd/ce/README.md)              |
-| **Orchestration Engine (OE)**   | 8080 | Request coordination and routing | [OE README](../cmd/oe/README.md)              |
+| **Orchestration Engine (OE)**   | 4000 | Request coordination and routing | [OE README](../cmd/oe/README.md)              |
 
 ## Architecture
 
