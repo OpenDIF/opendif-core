@@ -107,8 +107,8 @@ services:
 
   orchestration-engine:
     build:
-      context: ./orchestration-engine
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: cmd/oe/Dockerfile
       args:
         BUILD_VERSION: ${BUILD_VERSION:-dev}
         BUILD_TIME: ${BUILD_TIME:-2025-09-09T16:30:00Z}
@@ -134,7 +134,7 @@ services:
       - ENABLE_AUDIT=${ENABLE_AUDIT:-false}
       - ARGUS_API_KEY=${ARGUS_API_KEY:-test-audit-token}
     volumes:
-      - ./orchestration-engine/config.docker.json:/app/config.json:ro
+      - ../cmd/oe/config.docker.json:/app/config.json:ro
     extra_hosts:
       # Lets the container reach mock providers running on the host
       # (resolves host.docker.internal on Linux too).

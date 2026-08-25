@@ -105,8 +105,8 @@ jobs:
             image: consent-engine
             description: Consent Engine service for managing data consent workflows
           - name: orchestration-engine
-            context: ./exchange/orchestration-engine
-            dockerfile: ./exchange/orchestration-engine/Dockerfile
+            context: .
+            dockerfile: ./cmd/oe/Dockerfile
             image: orchestration-engine
             description: Orchestration Engine service for coordinating data exchange workflows
           - name: admin-portal

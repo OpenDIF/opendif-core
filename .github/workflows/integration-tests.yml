@@ -5,10 +5,11 @@ on:
     branches: [main, int-test-fail-paths]
     paths:
       - "tests/integration/**"
-      - "exchange/orchestration-engine/**"
       - "exchange/policy-decision-point/**"
       - "cmd/ce/**"
       - "internal/ce/**"
+      - "cmd/oe/**"
+      - "internal/oe/**"
       - "internal/config/**"
       - "internal/constants/**"
       - "internal/monitoring/**"
@@ -23,10 +24,11 @@ on:
     branches: [main, int-test-fail-paths]
     paths:
       - "tests/integration/**"
-      - "exchange/orchestration-engine/**"
       - "exchange/policy-decision-point/**"
       - "cmd/ce/**"
       - "internal/ce/**"
+      - "cmd/oe/**"
+      - "internal/oe/**"
       - "internal/config/**"
       - "internal/constants/**"
       - "internal/monitoring/**"
@@ -116,7 +118,7 @@ jobs:
 
           # Build Orchestration Engine
           echo "Building Orchestration Engine..."
-          (cd exchange/orchestration-engine && go build -o ../../tests/integration/bin/orchestration-engine .) &
+          go build -o tests/integration/bin/orchestration-engine ./cmd/oe &
 
           # Build Mock Provider (Always built locally)
           echo "Building Mock Provider..."

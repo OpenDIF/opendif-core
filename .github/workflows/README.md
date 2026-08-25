@@ -11,7 +11,7 @@ Run on every PR when service code changes. Perform code quality checks and tests
 | Workflow                             | Service               | Triggers On                                    |
 | ------------------------------------ | --------------------- | ---------------------------------------------- |
 | `consent-engine-validate.yml`        | Consent Engine        | Changes to `cmd/ce/**`, `internal/ce/**`       |
-| `orchestration-engine-validate.yml`  | Orchestration Engine  | Changes to `exchange/orchestration-engine/**`  |
+| `orchestration-engine-validate.yml`  | Orchestration Engine  | Changes to `cmd/oe/**`, `internal/oe/**`       |
 | `policy-decision-point-validate.yml` | Policy Decision Point | Changes to `exchange/policy-decision-point/**` |
 | `portal-backend-validate.yml`        | Portal Backend        | Changes to `portal-backend/**`                 |
 | `integration-tests.yml`              | All Services          | Manual or scheduled                            |
@@ -30,7 +30,7 @@ Run only when Dockerfiles are modified. Optimizes CI time by skipping Docker bui
 | Workflow                                    | Triggers On                                            |
 |---------------------------------------------|--------------------------------------------------------|
 | `consent-engine-docker-validate.yml`        | Changes to `cmd/ce/Dockerfile`                         |
-| `orchestration-engine-docker-validate.yml`  | Changes to `exchange/orchestration-engine/Dockerfile`  |
+| `orchestration-engine-docker-validate.yml`  | Changes to `cmd/oe/Dockerfile`                         |
 | `policy-decision-point-docker-validate.yml` | Changes to `exchange/policy-decision-point/Dockerfile` |
 | `portal-backend-docker-validate.yml`        | Changes to `portal-backend/Dockerfile`                 |
 

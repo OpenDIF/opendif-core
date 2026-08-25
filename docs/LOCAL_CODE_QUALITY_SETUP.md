@@ -318,8 +318,8 @@ ls -d */go.mod | sed 's|/go.mod||' | grep -v '^go.mod$'
 Valid service names:
 
 - `portal-backend`
-- `exchange/orchestration-engine` (use `orchestration-engine`)
-- `exchange/consent-engine` (use `consent-engine`)
+- `cmd/oe` (use `orchestration-engine`)
+- `cmd/ce` (use `consent-engine`)
 - `exchange/policy-decision-point` (use `policy-decision-point`)
 
 ### Environment Setup Issues

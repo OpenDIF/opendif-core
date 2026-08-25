@@ -59,17 +59,22 @@ GIT_COMMIT := $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 
 # Service paths
 portal_backend_PATH := portal-backend
-ORCHESTRATION_ENGINE_PATH := exchange/orchestration-engine
 POLICY_DECISION_POINT_PATH := exchange/policy-decision-point
 
-# Consent Engine is part of the root Go module (see go.mod): its binary
-# entrypoint lives under cmd/ce, its implementation under internal/ce.
-# Because it isn't a self-contained module directory like the services above,
-# it uses the *-go-rootmod-service targets below instead of *-go-service.
+# Consent Engine and Orchestration Engine are part of the root Go module (see
+# go.mod): their binary entrypoints live under cmd/<svc>, their implementation
+# under internal/<svc>. Because they aren't self-contained module directories
+# like the services above, they use the *-go-rootmod-service targets below
+# instead of *-go-service.
 CONSENT_ENGINE_PATH := cmd/ce
 CONSENT_ENGINE_INTERNAL_PATH := internal/ce
 CONSENT_ENGINE_TEST_PATH := ./cmd/ce/... ./internal/ce/...
 CONSENT_ENGINE_DOCKERFILE := cmd/ce/Dockerfile
+
+ORCHESTRATION_ENGINE_PATH := cmd/oe
+ORCHESTRATION_ENGINE_INTERNAL_PATH := internal/oe
+ORCHESTRATION_ENGINE_TEST_PATH := ./cmd/oe/... ./internal/oe/...
+ORCHESTRATION_ENGINE_DOCKERFILE := cmd/oe/Dockerfile
 
 MEMBER_PORTAL_PATH := portals/apps/member
 ADMIN_PORTAL_PATH := portals/apps/admin
@@ -214,15 +219,15 @@ validate-test:
 	@SERVICE_NAME="$(word 2,$(MAKECMDGOALS))"; \
 	case "$$SERVICE_NAME" in \
 		portal-backend) SERVICE_PATH="$(portal_backend_PATH)"; TARGET="validate-test-go-service" ;; \
-		orchestration-engine) SERVICE_PATH="$(ORCHESTRATION_ENGINE_PATH)"; TARGET="validate-test-go-service" ;; \
-		consent-engine) TARGET="validate-test-go-rootmod-service" ;; \
+		orchestration-engine) SERVICE_PATH="$(ORCHESTRATION_ENGINE_PATH)"; SERVICE_TEST_PATH="$(ORCHESTRATION_ENGINE_TEST_PATH)"; TARGET="validate-test-go-rootmod-service" ;; \
+		consent-engine) SERVICE_PATH="$(CONSENT_ENGINE_PATH)"; SERVICE_TEST_PATH="$(CONSENT_ENGINE_TEST_PATH)"; TARGET="validate-test-go-rootmod-service" ;; \
 		policy-decision-point) SERVICE_PATH="$(POLICY_DECISION_POINT_PATH)"; TARGET="validate-test-go-service" ;; \
 		member-portal) SERVICE_PATH="$(MEMBER_PORTAL_PATH)"; TARGET="validate-test-frontend-service" ;; \
 		admin-portal) SERVICE_PATH="$(ADMIN_PORTAL_PATH)"; TARGET="validate-test-frontend-service" ;; \
 		consent-portal) SERVICE_PATH="$(CONSENT_PORTAL_PATH)"; TARGET="validate-test-frontend-service" ;; \
 		*) echo "❌ Unknown service: $$SERVICE_NAME"; echo "Available services: $(GO_SERVICES) $(FRONTEND_SERVICES)"; exit 1 ;; \
 	esac; \
-	$(MAKE) $$TARGET SERVICE=$$SERVICE_NAME SERVICE_PATH=$$SERVICE_PATH SERVICE_TEST_PATH="$(CONSENT_ENGINE_TEST_PATH)"
+	$(MAKE) $$TARGET SERVICE=$$SERVICE_NAME SERVICE_PATH=$$SERVICE_PATH SERVICE_TEST_PATH="$$SERVICE_TEST_PATH"
 
 # =============================================================================
 # DOCKER BUILD VALIDATION COMMANDS
@@ -256,15 +261,15 @@ validate-docker-build:
 	@SERVICE_NAME="$(word 2,$(MAKECMDGOALS))"; \
 	case "$$SERVICE_NAME" in \
 		portal-backend) SERVICE_PATH="$(portal_backend_PATH)"; TARGET="validate-docker-build-service" ;; \
-		orchestration-engine) SERVICE_PATH="$(ORCHESTRATION_ENGINE_PATH)"; TARGET="validate-docker-build-service" ;; \
-		consent-engine) TARGET="validate-docker-build-rootmod-service" ;; \
+		orchestration-engine) SERVICE_DOCKERFILE="$(ORCHESTRATION_ENGINE_DOCKERFILE)"; TARGET="validate-docker-build-rootmod-service" ;; \
+		consent-engine) SERVICE_DOCKERFILE="$(CONSENT_ENGINE_DOCKERFILE)"; TARGET="validate-docker-build-rootmod-service" ;; \
 		policy-decision-point) SERVICE_PATH="$(POLICY_DECISION_POINT_PATH)"; TARGET="validate-docker-build-service" ;; \
 		member-portal) SERVICE_PATH="$(MEMBER_PORTAL_PATH)"; TARGET="validate-docker-build-service" ;; \
 		admin-portal) SERVICE_PATH="$(ADMIN_PORTAL_PATH)"; TARGET="validate-docker-build-service" ;; \
 		consent-portal) SERVICE_PATH="$(CONSENT_PORTAL_PATH)"; TARGET="validate-docker-build-service" ;; \
 		*) echo "❌ Unknown service: $$SERVICE_NAME"; echo "Available services: $(GO_SERVICES) $(FRONTEND_SERVICES)"; exit 1 ;; \
 	esac; \
-	$(MAKE) $$TARGET SERVICE=$$SERVICE_NAME SERVICE_PATH=$$SERVICE_PATH SERVICE_DOCKERFILE=$(CONSENT_ENGINE_DOCKERFILE)
+	$(MAKE) $$TARGET SERVICE=$$SERVICE_NAME SERVICE_PATH=$$SERVICE_PATH SERVICE_DOCKERFILE=$$SERVICE_DOCKERFILE
 
 # =============================================================================
 # CODE QUALITY COMMANDS
@@ -465,78 +470,78 @@ format:
 	@SERVICE_NAME="$(word 2,$(MAKECMDGOALS))"; \
 	case "$$SERVICE_NAME" in \
 		portal-backend) SERVICE_PATH="$(portal_backend_PATH)"; TARGET="format-go-service" ;; \
-		orchestration-engine) SERVICE_PATH="$(ORCHESTRATION_ENGINE_PATH)"; TARGET="format-go-service" ;; \
-		consent-engine) TARGET="format-go-rootmod-service" ;; \
+		orchestration-engine) SERVICE_PATH="$(ORCHESTRATION_ENGINE_PATH)"; SERVICE_INTERNAL_PATH="$(ORCHESTRATION_ENGINE_INTERNAL_PATH)"; TARGET="format-go-rootmod-service" ;; \
+		consent-engine) SERVICE_PATH="$(CONSENT_ENGINE_PATH)"; SERVICE_INTERNAL_PATH="$(CONSENT_ENGINE_INTERNAL_PATH)"; TARGET="format-go-rootmod-service" ;; \
 		policy-decision-point) SERVICE_PATH="$(POLICY_DECISION_POINT_PATH)"; TARGET="format-go-service" ;; \
 		*) echo "❌ Unknown Go service: $$SERVICE_NAME"; echo "Available Go services: $(GO_SERVICES)"; exit 1 ;; \
 	esac; \
-	$(MAKE) $$TARGET SERVICE=$$SERVICE_NAME SERVICE_PATH="$${SERVICE_PATH:-$(CONSENT_ENGINE_PATH)}" SERVICE_INTERNAL_PATH=$(CONSENT_ENGINE_INTERNAL_PATH)
+	$(MAKE) $$TARGET SERVICE=$$SERVICE_NAME SERVICE_PATH="$$SERVICE_PATH" SERVICE_INTERNAL_PATH="$$SERVICE_INTERNAL_PATH"
 
 # Lint router
 lint:
 	@SERVICE_NAME="$(word 2,$(MAKECMDGOALS))"; \
 	case "$$SERVICE_NAME" in \
 		portal-backend) SERVICE_PATH="$(portal_backend_PATH)"; TARGET="lint-go-service" ;; \
-		orchestration-engine) SERVICE_PATH="$(ORCHESTRATION_ENGINE_PATH)"; TARGET="lint-go-service" ;; \
-		consent-engine) TARGET="lint-go-rootmod-service" ;; \
+		orchestration-engine) SERVICE_PATH="$(ORCHESTRATION_ENGINE_PATH)"; SERVICE_INTERNAL_PATH="$(ORCHESTRATION_ENGINE_INTERNAL_PATH)"; SERVICE_TEST_PATH="$(ORCHESTRATION_ENGINE_TEST_PATH)"; TARGET="lint-go-rootmod-service" ;; \
+		consent-engine) SERVICE_PATH="$(CONSENT_ENGINE_PATH)"; SERVICE_INTERNAL_PATH="$(CONSENT_ENGINE_INTERNAL_PATH)"; SERVICE_TEST_PATH="$(CONSENT_ENGINE_TEST_PATH)"; TARGET="lint-go-rootmod-service" ;; \
 		policy-decision-point) SERVICE_PATH="$(POLICY_DECISION_POINT_PATH)"; TARGET="lint-go-service" ;; \
 		*) echo "❌ Unknown Go service: $$SERVICE_NAME"; echo "Available Go services: $(GO_SERVICES)"; exit 1 ;; \
 	esac; \
-	$(MAKE) $$TARGET SERVICE=$$SERVICE_NAME SERVICE_PATH="$${SERVICE_PATH:-$(CONSENT_ENGINE_PATH)}" SERVICE_INTERNAL_PATH=$(CONSENT_ENGINE_INTERNAL_PATH) SERVICE_TEST_PATH="$(CONSENT_ENGINE_TEST_PATH)"
+	$(MAKE) $$TARGET SERVICE=$$SERVICE_NAME SERVICE_PATH="$$SERVICE_PATH" SERVICE_INTERNAL_PATH="$$SERVICE_INTERNAL_PATH" SERVICE_TEST_PATH="$$SERVICE_TEST_PATH"
 
 # Staticcheck router
 staticcheck:
 	@SERVICE_NAME="$(word 2,$(MAKECMDGOALS))"; \
 	case "$$SERVICE_NAME" in \
 		portal-backend) SERVICE_PATH="$(portal_backend_PATH)"; TARGET="staticcheck-go-service" ;; \
-		orchestration-engine) SERVICE_PATH="$(ORCHESTRATION_ENGINE_PATH)"; TARGET="staticcheck-go-service" ;; \
-		consent-engine) TARGET="staticcheck-go-rootmod-service" ;; \
+		orchestration-engine) SERVICE_PATH="$(ORCHESTRATION_ENGINE_PATH)"; SERVICE_TEST_PATH="$(ORCHESTRATION_ENGINE_TEST_PATH)"; TARGET="staticcheck-go-rootmod-service" ;; \
+		consent-engine) SERVICE_PATH="$(CONSENT_ENGINE_PATH)"; SERVICE_TEST_PATH="$(CONSENT_ENGINE_TEST_PATH)"; TARGET="staticcheck-go-rootmod-service" ;; \
 		policy-decision-point) SERVICE_PATH="$(POLICY_DECISION_POINT_PATH)"; TARGET="staticcheck-go-service" ;; \
 		*) echo "❌ Unknown Go service: $$SERVICE_NAME"; echo "Available Go services: $(GO_SERVICES)"; exit 1 ;; \
 	esac; \
-	$(MAKE) $$TARGET SERVICE=$$SERVICE_NAME SERVICE_PATH="$$SERVICE_PATH" SERVICE_TEST_PATH="$(CONSENT_ENGINE_TEST_PATH)"
+	$(MAKE) $$TARGET SERVICE=$$SERVICE_NAME SERVICE_PATH="$$SERVICE_PATH" SERVICE_TEST_PATH="$$SERVICE_TEST_PATH"
 
 # Security router
 security:
 	@SERVICE_NAME="$(word 2,$(MAKECMDGOALS))"; \
 	case "$$SERVICE_NAME" in \
 		portal-backend) SERVICE_PATH="$(portal_backend_PATH)"; TARGET="security-go-service" ;; \
-		orchestration-engine) SERVICE_PATH="$(ORCHESTRATION_ENGINE_PATH)"; TARGET="security-go-service" ;; \
-		consent-engine) TARGET="security-go-rootmod-service" ;; \
+		orchestration-engine) SERVICE_PATH="$(ORCHESTRATION_ENGINE_PATH)"; SERVICE_TEST_PATH="$(ORCHESTRATION_ENGINE_TEST_PATH)"; TARGET="security-go-rootmod-service" ;; \
+		consent-engine) SERVICE_PATH="$(CONSENT_ENGINE_PATH)"; SERVICE_TEST_PATH="$(CONSENT_ENGINE_TEST_PATH)"; TARGET="security-go-rootmod-service" ;; \
 		policy-decision-point) SERVICE_PATH="$(POLICY_DECISION_POINT_PATH)"; TARGET="security-go-service" ;; \
 		*) echo "❌ Unknown Go service: $$SERVICE_NAME"; echo "Available Go services: $(GO_SERVICES)"; exit 1 ;; \
 	esac; \
-	$(MAKE) $$TARGET SERVICE=$$SERVICE_NAME SERVICE_PATH="$$SERVICE_PATH" SERVICE_TEST_PATH="$(CONSENT_ENGINE_TEST_PATH)"
+	$(MAKE) $$TARGET SERVICE=$$SERVICE_NAME SERVICE_PATH="$$SERVICE_PATH" SERVICE_TEST_PATH="$$SERVICE_TEST_PATH"
 
 # Quality check router
 quality-check:
 	@SERVICE_NAME="$(word 2,$(MAKECMDGOALS))"; \
 	case "$$SERVICE_NAME" in \
 		portal-backend) SERVICE_PATH="$(portal_backend_PATH)"; TARGET="quality-check-go-service" ;; \
-		orchestration-engine) SERVICE_PATH="$(ORCHESTRATION_ENGINE_PATH)"; TARGET="quality-check-go-service" ;; \
-		consent-engine) TARGET="quality-check-go-rootmod-service" ;; \
+		orchestration-engine) SERVICE_PATH="$(ORCHESTRATION_ENGINE_PATH)"; SERVICE_INTERNAL_PATH="$(ORCHESTRATION_ENGINE_INTERNAL_PATH)"; SERVICE_TEST_PATH="$(ORCHESTRATION_ENGINE_TEST_PATH)"; TARGET="quality-check-go-rootmod-service" ;; \
+		consent-engine) SERVICE_PATH="$(CONSENT_ENGINE_PATH)"; SERVICE_INTERNAL_PATH="$(CONSENT_ENGINE_INTERNAL_PATH)"; SERVICE_TEST_PATH="$(CONSENT_ENGINE_TEST_PATH)"; TARGET="quality-check-go-rootmod-service" ;; \
 		policy-decision-point) SERVICE_PATH="$(POLICY_DECISION_POINT_PATH)"; TARGET="quality-check-go-service" ;; \
 		member-portal) SERVICE_PATH="$(MEMBER_PORTAL_PATH)"; TARGET="check-lint-frontend-service" ;; \
 		admin-portal) SERVICE_PATH="$(ADMIN_PORTAL_PATH)"; TARGET="check-lint-frontend-service" ;; \
 		consent-portal) SERVICE_PATH="$(CONSENT_PORTAL_PATH)"; TARGET="check-lint-frontend-service" ;; \
 		*) echo "❌ Unknown service: $$SERVICE_NAME"; echo "Available services: $(GO_SERVICES) $(FRONTEND_SERVICES)"; exit 1 ;; \
 	esac; \
-	$(MAKE) $$TARGET SERVICE=$$SERVICE_NAME SERVICE_PATH="$${SERVICE_PATH:-$(CONSENT_ENGINE_PATH)}" SERVICE_INTERNAL_PATH=$(CONSENT_ENGINE_INTERNAL_PATH) SERVICE_TEST_PATH="$(CONSENT_ENGINE_TEST_PATH)"
+	$(MAKE) $$TARGET SERVICE=$$SERVICE_NAME SERVICE_PATH="$$SERVICE_PATH" SERVICE_INTERNAL_PATH="$$SERVICE_INTERNAL_PATH" SERVICE_TEST_PATH="$$SERVICE_TEST_PATH"
 
 # Legacy lint check router (for backward compatibility)
 check-lint:
 	@SERVICE_NAME="$(word 2,$(MAKECMDGOALS))"; \
 	case "$$SERVICE_NAME" in \
 		portal-backend) SERVICE_PATH="$(portal_backend_PATH)"; TARGET="check-lint-go-service" ;; \
-		orchestration-engine) SERVICE_PATH="$(ORCHESTRATION_ENGINE_PATH)"; TARGET="check-lint-go-service" ;; \
-		consent-engine) TARGET="check-lint-go-rootmod-service" ;; \
+		orchestration-engine) SERVICE_PATH="$(ORCHESTRATION_ENGINE_PATH)"; SERVICE_INTERNAL_PATH="$(ORCHESTRATION_ENGINE_INTERNAL_PATH)"; SERVICE_TEST_PATH="$(ORCHESTRATION_ENGINE_TEST_PATH)"; TARGET="check-lint-go-rootmod-service" ;; \
+		consent-engine) SERVICE_PATH="$(CONSENT_ENGINE_PATH)"; SERVICE_INTERNAL_PATH="$(CONSENT_ENGINE_INTERNAL_PATH)"; SERVICE_TEST_PATH="$(CONSENT_ENGINE_TEST_PATH)"; TARGET="check-lint-go-rootmod-service" ;; \
 		policy-decision-point) SERVICE_PATH="$(POLICY_DECISION_POINT_PATH)"; TARGET="check-lint-go-service" ;; \
 		member-portal) SERVICE_PATH="$(MEMBER_PORTAL_PATH)"; TARGET="check-lint-frontend-service" ;; \
 		admin-portal) SERVICE_PATH="$(ADMIN_PORTAL_PATH)"; TARGET="check-lint-frontend-service" ;; \
 		consent-portal) SERVICE_PATH="$(CONSENT_PORTAL_PATH)"; TARGET="check-lint-frontend-service" ;; \
 		*) echo "❌ Unknown service: $$SERVICE_NAME"; echo "Available services: $(GO_SERVICES) $(FRONTEND_SERVICES)"; exit 1 ;; \
 	esac; \
-	$(MAKE) $$TARGET SERVICE=$$SERVICE_NAME SERVICE_PATH="$${SERVICE_PATH:-$(CONSENT_ENGINE_PATH)}" SERVICE_INTERNAL_PATH=$(CONSENT_ENGINE_INTERNAL_PATH) SERVICE_TEST_PATH="$(CONSENT_ENGINE_TEST_PATH)"
+	$(MAKE) $$TARGET SERVICE=$$SERVICE_NAME SERVICE_PATH="$$SERVICE_PATH" SERVICE_INTERNAL_PATH="$$SERVICE_INTERNAL_PATH" SERVICE_TEST_PATH="$$SERVICE_TEST_PATH"
 
 # =============================================================================
 # RUN COMMANDS

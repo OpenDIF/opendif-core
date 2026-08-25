@@ -122,10 +122,14 @@ Before submitting a pull request, ensure:
 
 ```
 openndx-core/
-├── exchange/              # Go backend services
-│   ├── orchestration-engine/
+├── cmd/                   # Go service entrypoints
+│   ├── oe/                # Orchestration Engine
+│   └── ce/                # Consent Engine
+├── internal/              # Go service internals
+│   ├── oe/
+│   └── ce/
+├── exchange/              # Go backend services (not yet migrated to root module)
 │   ├── policy-decision-point/
-│   ├── consent-engine/
 │   └── ...
 ├── portals/               # Frontend React applications (pnpm workspace)
 │   ├── apps/

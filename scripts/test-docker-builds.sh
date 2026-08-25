@@ -65,7 +65,7 @@ echo ""
 OVERALL_STATUS=0
 
 # Build orchestration-engine
-if ! build_service "orchestration-engine" "exchange/orchestration-engine/Dockerfile" "exchange/orchestration-engine"; then
+if ! build_service "orchestration-engine" "cmd/oe/Dockerfile" "cmd/oe"; then
     OVERALL_STATUS=1
 fi
 echo ""

@@ -25,7 +25,7 @@ cd ../tests/integration && docker compose -f docker-compose.test.yml up -d && go
 |---------------------------------|------|----------------------------------|-----------------------------------------------|
 | **Policy Decision Point (PDP)** | 8082 | ABAC authorization using OPA     | [PDP README](policy-decision-point/README.md) |
 | **Consent Engine (CE)**         | 8081 | Consent management and workflow  | [CE README](../cmd/ce/README.md)              |
-| **Orchestration Engine (OE)**   | 8080 | Request coordination and routing | [OE README](orchestration-engine/README.md)   |
+| **Orchestration Engine (OE)**   | 4000 | Request coordination and routing | [OE README](../cmd/oe/README.md)              |
 
 ## Architecture
 
@@ -285,21 +285,23 @@ Copy `.env.example` to `.env` and adjust for your environment:
 ```
 exchange/
 ├── policy-decision-point/    # Policy service (Port 8082)
-├── orchestration-engine/  # Orchestration service (Port 8080)
 ├── shared/                   # Shared utilities and packages
 ├── scripts/                  # Management scripts
 ├── docker-compose.yml        # Multi-environment orchestration
 └── Makefile                  # Convenience commands
 
-# Consent Engine (CE) now lives in the root Go module, not under exchange/:
+# Consent Engine (CE) and Orchestration Engine (OE) now live in the root Go
+# module, not under exchange/:
 cmd/ce/                       # Consent service entrypoint, Dockerfile, migrations (Port 8081)
 internal/ce/                  # Consent service implementation
+cmd/oe/                       # Orchestration service entrypoint, Dockerfile (Port 8080)
+internal/oe/                  # Orchestration service implementation
 ```
 
 ## Related Documentation
 
 - [Policy Decision Point README](policy-decision-point/README.md)
 - [Consent Engine README](../cmd/ce/README.md)
-- [Orchestration Engine README](orchestration-engine/README.md)
+- [Orchestration Engine README](../cmd/oe/README.md)
 - [Integration Tests README](../tests/integration/README.md)
 - [Scripts README](scripts/README.md)
