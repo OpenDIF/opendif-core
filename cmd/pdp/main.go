@@ -7,10 +7,10 @@ import (
 	"os"
 	"time"
 
-	"github.com/OpenNDX/openndx-core/exchange/policy-decision-point/internal/config"
-	"github.com/OpenNDX/openndx-core/exchange/policy-decision-point/internal/db"
-	"github.com/OpenNDX/openndx-core/exchange/policy-decision-point/internal/handler"
-	"github.com/OpenNDX/openndx-core/exchange/shared/utils"
+	"github.com/openndx/openndx-core/internal/pdp/config"
+	"github.com/openndx/openndx-core/internal/pdp/db"
+	"github.com/openndx/openndx-core/internal/pdp/handler"
+	"github.com/openndx/openndx-core/internal/utils"
 )
 
 // Build information - set during build

@@ -95,8 +95,8 @@ jobs:
             image: portal-backend
             description: Portal Backend service for the Data Exchange platform
           - name: policy-decision-point
-            context: ./exchange/policy-decision-point
-            dockerfile: ./exchange/policy-decision-point/Dockerfile
+            context: .
+            dockerfile: ./cmd/pdp/Dockerfile
             image: policy-decision-point
             description: Policy Decision Point service for authorization decisions
           - name: consent-engine

@@ -23,7 +23,7 @@ cd ../tests/integration && docker compose -f docker-compose.test.yml up -d && go
 
 | Service                         | Port | Purpose                          | Documentation                                 |
 |---------------------------------|------|----------------------------------|-----------------------------------------------|
-| **Policy Decision Point (PDP)** | 8082 | ABAC authorization using OPA     | [PDP README](policy-decision-point/README.md) |
+| **Policy Decision Point (PDP)** | 8082 | ABAC authorization using OPA     | [PDP README](../cmd/pdp/README.md)            |
 | **Consent Engine (CE)**         | 8081 | Consent management and workflow  | [CE README](../cmd/ce/README.md)              |
 | **Orchestration Engine (OE)**   | 4000 | Request coordination and routing | [OE README](../cmd/oe/README.md)              |
 
@@ -206,8 +206,8 @@ docker compose up --build
 #### Unit Tests
 
 ```bash
-# Policy Decision Point
-cd policy-decision-point && go test -v
+# Policy Decision Point (now part of the root Go module — run from the repo root)
+cd ../.. && go test ./cmd/pdp/... ./internal/pdp/... -v
 
 # Consent Engine (now part of the root Go module — run from the repo root)
 cd ../.. && go test ./cmd/ce/... ./internal/ce/... -v
@@ -284,14 +284,15 @@ Copy `.env.example` to `.env` and adjust for your environment:
 
 ```
 exchange/
-├── policy-decision-point/    # Policy service (Port 8082)
 ├── shared/                   # Shared utilities and packages
 ├── scripts/                  # Management scripts
 ├── docker-compose.yml        # Multi-environment orchestration
 └── Makefile                  # Convenience commands
 
-# Consent Engine (CE) and Orchestration Engine (OE) now live in the root Go
-# module, not under exchange/:
+# Policy Decision Point (PDP), Consent Engine (CE), and Orchestration Engine
+# (OE) now live in the root Go module, not under exchange/:
+cmd/pdp/                      # Policy service entrypoint, Dockerfile (Port 8082)
+internal/pdp/                 # Policy service implementation
 cmd/ce/                       # Consent service entrypoint, Dockerfile, migrations (Port 8081)
 internal/ce/                  # Consent service implementation
 cmd/oe/                       # Orchestration service entrypoint, Dockerfile (Port 8080)
@@ -300,7 +301,7 @@ internal/oe/                  # Orchestration service implementation
 
 ## Related Documentation
 
-- [Policy Decision Point README](policy-decision-point/README.md)
+- [Policy Decision Point README](../cmd/pdp/README.md)
 - [Consent Engine README](../cmd/ce/README.md)
 - [Orchestration Engine README](../cmd/oe/README.md)
 - [Integration Tests README](../tests/integration/README.md)

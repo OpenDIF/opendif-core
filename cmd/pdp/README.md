@@ -22,17 +22,14 @@ The PDP provides attribute-based access control (ABAC) with field-level permissi
 
 ### Prerequisites
 
-- Go 1.24+
+- Go 1.26+
 - PostgreSQL 13+
 
 ### Run the Service
 
 ```bash
-# Install dependencies
-go mod download
-
 # Copy environment template
-cp .env.example .env
+cp cmd/pdp/.env.example cmd/pdp/.env
 
 # Edit .env with your database configuration
 # DB_HOST=localhost
@@ -41,12 +38,11 @@ cp .env.example .env
 # DB_PASSWORD=password
 # DB_NAME=pdp
 
-# Run locally
-go run main.go
+# Run locally (from the repo root)
+go run ./cmd/pdp
 
 # Or build and run
-go build -o policy-decision-point
-./policy-decision-point
+go build -o pdp ./cmd/pdp && ./pdp
 ```
 
 The service runs on port 8082 by default.
@@ -57,20 +53,20 @@ The service runs on port 8082 by default.
 
 All configuration is done via environment variables. See `.env.example` for a complete list.
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `PORT` | Service port | `8082` |
-| `ENVIRONMENT` | `production` or `local` | `local` |
-| `IDP_ORG_NAME` | IDP organization name | - |
-| `IDP_ISSUER` | JWT issuer URL | - |
-| `IDP_AUDIENCE` | JWT audience | - |
-| `IDP_JWKS_URL` | JWKS endpoint URL | - |
-| `DB_HOST` | Database host | `localhost` |
-| `DB_PORT` | Database port | `5432` |
-| `DB_USERNAME` | Database username | `postgres` |
-| `DB_PASSWORD` | Database password | - |
-| `DB_NAME` | Database name | `pdp` |
-| `DB_SSLMODE` | SSL mode | `require` |
+| Variable       | Description             | Default     |
+|----------------|-------------------------|-------------|
+| `PORT`         | Service port            | `8082`      |
+| `ENVIRONMENT`  | `production` or `local` | `local`     |
+| `IDP_ORG_NAME` | IDP organization name   | -           |
+| `IDP_ISSUER`   | JWT issuer URL          | -           |
+| `IDP_AUDIENCE` | JWT audience            | -           |
+| `IDP_JWKS_URL` | JWKS endpoint URL       | -           |
+| `DB_HOST`      | Database host           | `localhost` |
+| `DB_PORT`      | Database port           | `5432`      |
+| `DB_USERNAME`  | Database username       | `postgres`  |
+| `DB_PASSWORD`  | Database password       | -           |
+| `DB_NAME`      | Database name           | `pdp`       |
+| `DB_SSLMODE`   | SSL mode                | `require`   |
 
 **Optional:**
 ```bash
@@ -79,14 +75,14 @@ RUN_MIGRATION=false       # Set to "true" to run migrations on startup
 
 ## API Endpoints
 
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api/v1/policy/decide` | POST | Authorization decision |
-| `/api/v1/policy/metadata` | POST | Create policy metadata for fields |
-| `/api/v1/policy/update-allowlist` | POST | Update allow list for applications |
-| `/health` | GET | Health check |
-| `/debug` | GET | Debug information |
-| `/debug/db` | GET | Database connection status |
+| Endpoint                          | Method | Description                        |
+|-----------------------------------|--------|------------------------------------|
+| `/api/v1/policy/decide`           | POST   | Authorization decision             |
+| `/api/v1/policy/metadata`         | POST   | Create policy metadata for fields  |
+| `/api/v1/policy/update-allowlist` | POST   | Update allow list for applications |
+| `/health`                         | GET    | Health check                       |
+| `/debug`                          | GET    | Debug information                  |
+| `/debug/db`                       | GET    | Database connection status         |
 
 ### Authorization Request
 
@@ -189,11 +185,11 @@ Consent requirement is calculated as: `!is_owner && access_control_type != "publ
 ## Testing
 
 ```bash
-# Run all tests
-go test ./...
+# From the repo root
+go test ./cmd/pdp/... ./internal/pdp/... -count=1
 
 # Run with coverage
-go test ./... -cover
+go test ./cmd/pdp/... ./internal/pdp/... -cover
 
 # Test authorization scenarios
 curl -X POST http://localhost:8082/api/v1/policy/decide \

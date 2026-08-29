@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/OpenNDX/openndx-core/exchange/policy-decision-point/internal/config"
+	"github.com/openndx/openndx-core/internal/pdp/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gorm.io/driver/sqlite"

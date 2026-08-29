@@ -12,7 +12,7 @@ Run on every PR when service code changes. Perform code quality checks and tests
 | ------------------------------------ | --------------------- | ---------------------------------------------- |
 | `consent-engine-validate.yml`        | Consent Engine        | Changes to `cmd/ce/**`, `internal/ce/**`       |
 | `orchestration-engine-validate.yml`  | Orchestration Engine  | Changes to `cmd/oe/**`, `internal/oe/**`       |
-| `policy-decision-point-validate.yml` | Policy Decision Point | Changes to `exchange/policy-decision-point/**` |
+| `policy-decision-point-validate.yml` | Policy Decision Point | Changes to `cmd/pdp/**`, `internal/pdp/**`     |
 | `portal-backend-validate.yml`        | Portal Backend        | Changes to `portal-backend/**`                 |
 | `integration-tests.yml`              | All Services          | Manual or scheduled                            |
 

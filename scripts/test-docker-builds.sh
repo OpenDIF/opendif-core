@@ -77,7 +77,7 @@ fi
 echo ""
 
 # Build policy-decision-point
-if ! build_service "policy-decision-point" "exchange/policy-decision-point/Dockerfile" "exchange/policy-decision-point"; then
+if ! build_service "policy-decision-point" "cmd/pdp/Dockerfile" "cmd/pdp"; then
     OVERALL_STATUS=1
 fi
 echo ""
