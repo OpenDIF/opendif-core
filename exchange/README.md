@@ -207,10 +207,10 @@ docker compose up --build
 
 ```bash
 # Policy Decision Point (now part of the root Go module — run from the repo root)
-cd ../.. && go test ./cmd/pdp/... ./internal/pdp/... -v
+cd .. && go test ./cmd/pdp/... ./internal/pdp/... -v
 
 # Consent Engine (now part of the root Go module — run from the repo root)
-cd ../.. && go test ./cmd/ce/... ./internal/ce/... -v
+cd .. && go test ./cmd/ce/... ./internal/ce/... -v
 ```
 
 #### Integration Tests

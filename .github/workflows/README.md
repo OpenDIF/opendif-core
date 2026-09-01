@@ -22,10 +22,24 @@ Run on every PR when service code changes. Perform code quality checks and tests
 - Go build
 - Unit & integration tests
 - TruffleHog secret scanning
+
+### 2. Docker Validation Workflows (Dockerfile Changes Only)
+
+Run only when Dockerfiles are modified. Optimizes CI time by skipping Docker builds on code-only changes.
+
+| Workflow                                    | Triggers On                                            |
+|---------------------------------------------|--------------------------------------------------------|
+| `consent-engine-docker-validate.yml`        | Changes to `cmd/ce/Dockerfile`                         |
+| `orchestration-engine-docker-validate.yml`  | Changes to `cmd/oe/Dockerfile`                         |
+| `policy-decision-point-docker-validate.yml` | Changes to `cmd/pdp/Dockerfile`                        |
+| `portal-backend-docker-validate.yml`        | Changes to `portal-backend/Dockerfile`                 |
+
+**What they do:**
+
 - Docker image build validation
 - Trivy vulnerability scanning, with results uploaded to the GitHub Security tab
 
-### 2. Publish Workflows (Production)
+### 3. Publish Workflows (Production)
 
 Build and publish Docker images to GitHub Container Registry when code is merged to main.
 
