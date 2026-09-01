@@ -197,6 +197,7 @@ docker build -t portal-backend -f cmd/pb/Dockerfile .
 # Run container
 docker run -p 3000:3000 \
   -e DB_HOST=host.docker.internal \
+  -e PDP_SERVICE_URL=http://host.docker.internal:8082 \
   --env-file cmd/pb/.env \
   portal-backend
 ```
