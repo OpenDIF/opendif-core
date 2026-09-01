@@ -22,25 +22,10 @@ Run on every PR when service code changes. Perform code quality checks and tests
 - Go build
 - Unit & integration tests
 - TruffleHog secret scanning
-
-### 2. Docker Validation Workflows (Dockerfile Changes Only)
-
-Run only when Dockerfiles are modified. Optimizes CI time by skipping Docker builds on code-only changes.
-
-| Workflow                                    | Triggers On                                            |
-|---------------------------------------------|--------------------------------------------------------|
-| `consent-engine-docker-validate.yml`        | Changes to `cmd/ce/Dockerfile`                         |
-| `orchestration-engine-docker-validate.yml`  | Changes to `cmd/oe/Dockerfile`                         |
-| `policy-decision-point-docker-validate.yml` | Changes to `exchange/policy-decision-point/Dockerfile` |
-| `portal-backend-docker-validate.yml`        | Changes to `portal-backend/Dockerfile`                 |
-
-**What they do:**
-
 - Docker image build validation
-- Trivy security vulnerability scanning
-- Upload results to GitHub Security tab
+- Trivy vulnerability scanning, with results uploaded to the GitHub Security tab
 
-### 3. Publish Workflows (Production)
+### 2. Publish Workflows (Production)
 
 Build and publish Docker images to GitHub Container Registry when code is merged to main.
 
@@ -114,31 +99,12 @@ docker compose pull
 docker compose up -d
 ```
 
-## Workflow Optimization
-
-### Why Separate Docker Validation?
-
-Docker validation workflows are separated from code validation to:
-
-- **Reduce CI time**: Skip Docker builds when only code changes
-- **Faster feedback**: Get test results quicker on code-only PRs
-- **Resource efficiency**: Save GitHub Actions minutes
-- **Cleaner PR checks**: Only relevant checks appear (no skipped jobs)
-
-Docker validation only runs when Dockerfiles are modified, as Docker layer caching makes rebuilds fast and build failures due to code changes are caught by Go build steps.
-
 ## Troubleshooting
 
 **Validation workflow doesn't trigger:**
 
 - Check if files in the service directory changed
 - Verify the PR is targeting the correct branch
-
-**Docker validation workflow doesn't trigger:**
-
-- This is expected if you only changed code files
-- Docker validation only runs when the Dockerfile is modified
-- Use workflow_dispatch to manually trigger if needed
 
 **Build fails:**
 

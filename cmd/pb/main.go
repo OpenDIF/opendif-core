@@ -19,14 +19,26 @@ import (
 	"github.com/joho/godotenv"
 )
 
+// Build information - set during build
+var (
+	Version   = "dev"
+	BuildTime = "unknown"
+	GitCommit = "unknown"
+)
+
 func main() {
-	// Load .env file if it exists (optional - fails silently if not found)
-	_ = godotenv.Load()
+	// Load .env file if it exists (optional - fails silently if not found).
+	// Checks cmd/pb/.env first (repo-root `go run ./cmd/pb` usage per the
+	// README) before falling back to ./.env (cwd == cmd/pb usage).
+	_ = godotenv.Load("cmd/pb/.env", ".env")
 
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{AddSource: true}))
 	slog.SetDefault(logger)
 
-	slog.Info("Starting Portal Backend initialization")
+	slog.Info("Starting Portal Backend initialization",
+		"version", Version,
+		"build_time", BuildTime,
+		"git_commit", GitCommit)
 
 	// Initialize GORM database connection for V1
 	v1DbConfig := v1.NewDatabaseConfig()
@@ -195,7 +207,14 @@ func main() {
 	})))
 
 	topLevelMux.Handle("/debug", utils.PanicRecoveryMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		utils.RespondWithJSON(w, http.StatusOK, map[string]string{"path": r.URL.Path, "method": r.Method})
+		utils.RespondWithJSON(w, http.StatusOK, map[string]string{
+			"service":    "portal-backend",
+			"version":    Version,
+			"build_time": BuildTime,
+			"git_commit": GitCommit,
+			"path":       r.URL.Path,
+			"method":     r.Method,
+		})
 	})))
 
 	topLevelMux.Handle("/debug/db", utils.PanicRecoveryMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
