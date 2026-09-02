@@ -1,0 +1,30 @@
+# Orchestration Engine (OE) resource server: declares the `getdata` scope that
+# data-consumer clients request via client_credentials to call OE's federated
+# data API.
+resource_type: resource_server
+id: 01900000-0000-7000-8000-000000000090
+name: Orchestration Engine Resource Server
+description: OE resource server
+identifier: http://api.openndx.local
+ouHandle: default
+resources:
+  - name: Consumer
+    handle: getdata
+    description: Data Consumer
+---
+# Grants the sample data-consumer app (thunderid/bootstrap/application.yaml,
+# id ...091) the `getdata` scope on the OE resource server. No requestable
+# `scopes` on that client itself: for client_credentials, the granted scope
+# comes from this role instead.
+resource_type: role
+id: 01900000-0000-7000-8000-000000000092
+name: DataConsumerGetData
+description: Grants the sample data-consumer app the getdata scope on the OE resource server
+ouHandle: default
+permissions:
+  - resourceServerId: 01900000-0000-7000-8000-000000000090
+    permissions:
+      - getdata
+assignments:
+  - id: 01900000-0000-7000-8000-000000000091
+    type: app
