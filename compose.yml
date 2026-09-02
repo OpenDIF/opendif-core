@@ -26,7 +26,7 @@ services:
       - postgres-data:/var/lib/postgresql/data
       - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-exchange}"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-exchange} ${DB_NAME:-postgres}"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -126,6 +126,8 @@ services:
       - DB_PASSWORD=${DB_PASSWORD:-exchange}
       - DB_NAME=${DB_NAME_PDP:-pdp}
       - DB_SSLMODE=${DB_SSLMODE:-disable}
+      # IDP_AUDIENCE here is the OE resource server's identifier — kept separate
+      # from consent-engine's CONSENT_ENGINE_AUDIENCE, see resource.yaml.
       - IDP_ISSUER=${IDP_PUBLIC_URL:-}
       - IDP_AUDIENCE=${IDP_AUDIENCE:-}
       - IDP_JWKS_URL=${IDP_JWKS_URL:-}
@@ -155,8 +157,11 @@ services:
       - LOG_FORMAT=${LOG_FORMAT:-text}
       - CONSENT_PORTAL_URL=${CONSENT_PORTAL_URL:-http://localhost:5173}
       # IDP configuration (JWT verification for portal endpoints)
+      # Deliberately its own audience, distinct from OE/PDP's IDP_AUDIENCE — see
+      # thunderid/bootstrap/resource.yaml for why sharing one would let a token
+      # minted for one API be replayed against the other.
       - IDP_ISSUER=${IDP_PUBLIC_URL:-}
-      - IDP_AUDIENCE=${IDP_AUDIENCE:-}
+      - IDP_AUDIENCE=${CONSENT_ENGINE_AUDIENCE:-}
       - IDP_CLIENT_ID=${CONSENT_PORTAL_CLIENT_ID:-}
       - IDP_JWKS_URL=${IDP_JWKS_URL:-}
       - IDP_JWKS_INSECURE_SKIP_VERIFY=${IDP_JWKS_INSECURE_SKIP_VERIFY:-false}

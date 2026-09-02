@@ -39,6 +39,12 @@ inboundAuthConfig:
 # IDP_CLIENT_ID to validate portal-endpoint tokens. redirectUris are built from
 # CONSENT_PORTAL_URL, resolved at bootstrap time (SubstituteEnvironmentVariables);
 # the thunderid-setup service sets it.
+#
+# IMPORTANT: the authorize/token requests this app makes MUST include
+# `resource=http://consent.openndx.local` (the Consent Engine resource server
+# declared in thunderid/bootstrap/resource.yaml) so citizen tokens are audienced
+# for consent-engine, not the OE resource server — see that file's comment for why
+# sharing an audience across services would let tokens be replayed cross-API.
 resource_type: application
 id: 01900000-0000-7000-8000-0000000000a0
 name: Consent Portal

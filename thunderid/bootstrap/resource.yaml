@@ -28,3 +28,23 @@ permissions:
 assignments:
   - id: 01900000-0000-7000-8000-000000000091
     type: app
+---
+# Consent Engine's own resource server. ThunderID binds an access token's `aud` to
+# whatever resource server the caller requests, regardless of role/permission — a
+# resource identifier alone is enough to get a token audienced for it (verified: a
+# client with no role on this resource server can still mint one). So this MUST be
+# a distinct identifier from the OE resource server above: sharing one audience
+# between the citizen-facing Consent Portal and the M2M data-consumer flow would let
+# either token be replayed against the other service. The Consent Portal must
+# request `resource=http://consent.openndx.local` when it authenticates citizens,
+# and consent-engine validates against this same value (CONSENT_ENGINE_AUDIENCE).
+resource_type: resource_server
+id: 01900000-0000-7000-8000-000000000093
+name: Consent Engine Resource Server
+description: Consent Engine resource server for citizen-facing portal endpoints
+identifier: http://consent.openndx.local
+ouHandle: default
+resources:
+  - name: Portal
+    handle: access
+    description: Consent Portal citizen access
