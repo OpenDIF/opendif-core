@@ -83,12 +83,12 @@ All workflows include Trivy scanning:
 
 ## Using Published Images
 
-Update `docker-compose.yml`:
+Update `../../compose.yml`:
 
 ```yaml
 services:
   consent-engine:
-    image: ghcr.io/{owner}/consent-engine:latest
+    image: ghcr.io/openndx/consent-engine:latest
     # Remove 'build:' section
 ```
 

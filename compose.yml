@@ -36,7 +36,7 @@ services:
 
   policy-decision-point:
     build:
-      context: ..
+      context: .
       dockerfile: cmd/pdp/Dockerfile
       args:
         BUILD_VERSION: ${BUILD_VERSION:-dev}
@@ -69,7 +69,7 @@ services:
 
   consent-engine:
     build:
-      context: ..
+      context: .
       dockerfile: cmd/ce/Dockerfile
       args:
         BUILD_VERSION: ${BUILD_VERSION:-dev}
@@ -107,7 +107,7 @@ services:
 
   orchestration-engine:
     build:
-      context: ..
+      context: .
       dockerfile: cmd/oe/Dockerfile
       args:
         BUILD_VERSION: ${BUILD_VERSION:-dev}
@@ -134,7 +134,7 @@ services:
       - ENABLE_AUDIT=${ENABLE_AUDIT:-false}
       - ARGUS_API_KEY=${ARGUS_API_KEY:-test-audit-token}
     volumes:
-      - ../cmd/oe/config.docker.json:/app/config.json:ro
+      - ./cmd/oe/config.docker.json:/app/config.json:ro
     extra_hosts:
       # Lets the container reach mock providers running on the host
       # (resolves host.docker.internal on Linux too).
