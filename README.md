@@ -33,7 +33,7 @@ A comprehensive data exchange platform consisting of multiple microservices and 
 
 ### Request Flow
 
-```
+```text
 Data Consumer → Orchestration Engine → Policy Decision Point (PDP)
                      ↓
               Consent Engine (CE) ← (if consent required)
@@ -75,8 +75,8 @@ Before deploying OpenNDX, you must configure an Identity Provider (IdP) to handl
     ```
 
 2.  **Configure Environment**:
-    - Copy `.env.example` to `.env` in each service directory.
-    - Update the `.env` files with your IdP configuration (Client IDs, Issuer URLs, etc.) and database credentials.
+    - Copy the root `.env.example` to `.env` (`cp .env.example .env`).
+    - Update the `.env` file with your IdP configuration (Client IDs, Issuer URLs, etc.) and database credentials.
 
 3.  **Build and Run**:
     - Use the provided Makefile to build and run services.
@@ -153,26 +153,27 @@ go test ./cmd/ce/... ./internal/ce/... -v
 go test ./cmd/oe/... ./internal/oe/... -v
 
 # Integration tests
-cd tests/integration && docker compose -f docker-compose.test.yml up -d && go test -v ./... && docker compose -f docker-compose.test.yml down -v
+cd tests/integration && docker compose -f docker-compose.test.yml up -d && \
+  (go test -v ./...; docker compose -f docker-compose.test.yml down -v)
 ```
 
 ### API Reference
 
-| Service                      | Endpoint                   | Purpose                            |
-|------------------------------|----------------------------|------------------------------------|
-| Orchestration Engine (4000)  | `POST /graphql`            | GraphQL endpoint for data requests |
-| Policy Decision Point (8082) | `POST /decide`             | Authorization decision             |
-| Consent Engine (8081)        | `POST /consent`            | Process consent workflow request   |
-| Consent Engine (8081)        | `GET /consents/{id}`       | Get consent status                 |
-| Consent Engine (8081)        | `PUT /consents/{id}`       | Update consent status              |
-| Consent Engine (8081)        | `DELETE /consents/{id}`    | Revoke consent                     |
-| Consent Engine (8081)        | `GET /data-owner/{owner}`  | Get consents by data owner         |
-| Consent Engine (8081)        | `GET /consumer/{consumer}` | Get consents by consumer           |
-| all services                 | `GET /health`              | Health check                       |
+| Service                      | Endpoint                         | Purpose                            |
+|------------------------------|----------------------------------|------------------------------------|
+| Orchestration Engine (4000)  | `POST /graphql`                  | GraphQL endpoint for data requests |
+| Policy Decision Point (8082) | `POST /api/v1/policy/decide`     | Authorization decision             |
+| Consent Engine (8081)        | `POST /internal/api/v1/consents` | Process consent workflow request   |
+| Consent Engine (8081)        | `GET /consents/{id}`             | Get consent status                 |
+| Consent Engine (8081)        | `PUT /consents/{id}`             | Update consent status              |
+| Consent Engine (8081)        | `DELETE /consents/{id}`          | Revoke consent                     |
+| Consent Engine (8081)        | `GET /data-owner/{owner}`        | Get consents by data owner         |
+| Consent Engine (8081)        | `GET /consumer/{consumer}`       | Get consents by consumer           |
+| all services                 | `GET /health`                    | Health check                       |
 
 ```bash
 # Policy decision
-curl -X POST http://localhost:8082/decide \
+curl -X POST http://localhost:8082/api/v1/policy/decide \
   -H "Content-Type: application/json" \
   -d '{
     "consumer_id": "passport-app",
@@ -182,7 +183,7 @@ curl -X POST http://localhost:8082/decide \
   }'
 
 # Consent request
-curl -X POST http://localhost:8081/consents \
+curl -X POST http://localhost:8081/internal/api/v1/consents \
   -H "Content-Type: application/json" \
   -d '{
     "app_id": "passport-app",
