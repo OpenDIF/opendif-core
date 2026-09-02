@@ -22,6 +22,37 @@ A comprehensive data exchange platform consisting of multiple microservices and 
 - **Observability Stack** (`observability/`) - Metrics collection and visualization (Prometheus, Grafana)
 - **Audit Service** ([LSFLK/argus](https://github.com/LSFLK/argus)) - Audit logging and event tracking (optional, services function normally without it)
 
+### Services
+
+| Service                         | Port | Purpose                          | Documentation                   |
+|---------------------------------|------|----------------------------------|---------------------------------|
+| **Orchestration Engine (OE)**   | 4000 | Request coordination and routing | [OE README](cmd/oe/README.md)   |
+| **Policy Decision Point (PDP)** | 8082 | ABAC authorization using OPA     | [PDP README](cmd/pdp/README.md) |
+| **Consent Engine (CE)**         | 8081 | Consent management and workflow  | [CE README](cmd/ce/README.md)   |
+| **Portal Backend (PB)**         | -    | Backend for Admin/Member Portals | [PB README](cmd/pb/README.md)   |
+
+### Request Flow
+
+```
+Data Consumer → Orchestration Engine → Policy Decision Point (PDP)
+                     ↓
+              Consent Engine (CE) ← (if consent required)
+                     ↓
+              Data Provider
+```
+
+1. **Data Consumer Request** — a GraphQL request arrives at the Orchestration Engine.
+2. **PDP Evaluation** — the Orchestration Engine asks the PDP whether the request is
+   authorized and which fields (if any) still require consent.
+3. **Consent Management** — if consent is required, the Orchestration Engine calls
+   the Consent Engine, which returns a consent portal URL for the data owner.
+4. **Data Access** — once authorized (and consented, if required), the Orchestration
+   Engine fetches data from the appropriate Data Provider.
+
+See the [Orchestration Engine README](cmd/oe/README.md) for full request/response
+payloads and the [GraphQL/Policy/Consent flow doc](docs/FLOW-graphql-policy-consent-and-esignet-gap.md)
+for a deeper walkthrough.
+
 ## How to Deploy
 
 ### Prerequisites
@@ -98,6 +129,89 @@ make validate-build <service> # Build and validate a service
 make validate-test <service>  # Run tests for a service
 make quality-check <service>  # Run code quality checks
 ```
+
+## Local Development Stack (Docker Compose)
+
+The repo root `compose.yml` brings up Postgres plus OE, PDP, CE, and the
+optional audit service — a self-contained stack for exercising the full request
+flow end-to-end without running each Go binary by hand.
+
+```bash
+cp .env.example .env
+docker compose up --build
+```
+
+(docker compose automatically loads a `.env` file from the working directory —
+no `--env-file` flag needed.)
+
+### Testing
+
+```bash
+# Unit tests (from the repo root)
+go test ./cmd/pdp/... ./internal/pdp/... -v
+go test ./cmd/ce/... ./internal/ce/... -v
+go test ./cmd/oe/... ./internal/oe/... -v
+
+# Integration tests
+cd tests/integration && docker compose -f docker-compose.test.yml up -d && go test -v ./... && docker compose -f docker-compose.test.yml down -v
+```
+
+### API Reference
+
+| Service                      | Endpoint                   | Purpose                            |
+|------------------------------|----------------------------|------------------------------------|
+| Orchestration Engine (4000)  | `POST /graphql`            | GraphQL endpoint for data requests |
+| Policy Decision Point (8082) | `POST /decide`             | Authorization decision             |
+| Consent Engine (8081)        | `POST /consent`            | Process consent workflow request   |
+| Consent Engine (8081)        | `GET /consents/{id}`       | Get consent status                 |
+| Consent Engine (8081)        | `PUT /consents/{id}`       | Update consent status              |
+| Consent Engine (8081)        | `DELETE /consents/{id}`    | Revoke consent                     |
+| Consent Engine (8081)        | `GET /data-owner/{owner}`  | Get consents by data owner         |
+| Consent Engine (8081)        | `GET /consumer/{consumer}` | Get consents by consumer           |
+| all services                 | `GET /health`              | Health check                       |
+
+```bash
+# Policy decision
+curl -X POST http://localhost:8082/decide \
+  -H "Content-Type: application/json" \
+  -d '{
+    "consumer_id": "passport-app",
+    "app_id": "passport-app",
+    "request_id": "req_123",
+    "required_fields": ["person.fullName", "person.photo"]
+  }'
+
+# Consent request
+curl -X POST http://localhost:8081/consents \
+  -H "Content-Type: application/json" \
+  -d '{
+    "app_id": "passport-app",
+    "data_fields": [
+      {
+        "owner_type": "citizen",
+        "owner_id": "199512345678",
+        "fields": ["person.permanentAddress"]
+      }
+    ],
+    "purpose": "passport_application",
+    "session_id": "session_123",
+    "redirect_url": "https://passport-app.gov.lk/callback"
+  }'
+```
+
+### Environment Variables
+
+Copy `.env.example` to `.env` and adjust for your environment:
+
+| Variable                                      | Local example                        | Production example |
+|-----------------------------------------------|--------------------------------------|--------------------|
+| `ENVIRONMENT`                                 | `local`                              | `production`       |
+| `LOG_LEVEL`                                   | `info` or `debug`                    | `warn`             |
+| `LOG_FORMAT`                                  | `text`                               | `json`             |
+| `PORT_PDP` / `PORT_CE` / `PORT_OE`            | `8082` / `8081` / `4000`             | as needed          |
+| `BUILD_VERSION` / `BUILD_TIME` / `GIT_COMMIT` | `dev` / local values                 | CI-provided values |
+| `OTEL_METRICS_EXPORTER`                       | `prometheus`                         | as needed          |
+| `AUDIT_SERVICE_URL` / `ENABLE_AUDIT`          | `http://audit-service:3001` / `true` | as needed          |
 
 ## Contributing
 

@@ -160,7 +160,7 @@ export OTEL_METRICS_EXPORTER=none
 | `OTEL_EXPORTER_OTLP_HEADERS` | OTLP headers (e.g., API keys). Format: `key1=value1,key2=value2` | - | `DD-API-KEY=xxx,DD-SITE=datadoghq.com` |
 | `SERVICE_NAME` | Service name for metrics | `openndx-service` | `portal-backend` |
 
-**Note:** For Docker Compose deployments, add these environment variables to your `docker-compose.yml`:
+**Note:** For Docker Compose deployments, add these environment variables to your `compose.yml`:
 
 ```yaml
 services:
@@ -450,7 +450,7 @@ Services automatically initialize OpenTelemetry metrics when first used. No expl
    ```
 
 4. **Ensure service is on `openndx-network`:**
-   In your service's `docker-compose.yml`:
+   In your service's `compose.yml`:
    ```yaml
    services:
      your-service:
