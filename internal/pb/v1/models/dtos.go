@@ -74,7 +74,14 @@ type UpdateApplicationRequest struct {
 	ApplicationDescription *string `json:"applicationDescription,omitempty"`
 	Version                *string `json:"version,omitempty"`
 	// Note: SelectedFields is intentionally omitted from UpdateApplicationRequest.
-	// Field updates should be handled through a separate endpoint or process. That is not implemented yet.
+	// Field/policy updates go through UpdateApplicationPolicyRequest instead.
+}
+
+// UpdateApplicationPolicyRequest replaces an existing application's allow-list (its
+// requested schema fields and their PDP grant duration).
+type UpdateApplicationPolicyRequest struct {
+	SelectedFields []SelectedFieldRecord `json:"selectedFields" validate:"required,min=1"`
+	GrantDuration  *GrantDurationType    `json:"grantDuration,omitempty" validate:"omitempty,grant_duration_type_enum"`
 }
 
 type CreateMemberRequest struct {

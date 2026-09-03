@@ -198,6 +198,205 @@ func TestApplicationService_UpdateApplication(t *testing.T) {
 	})
 }
 
+func TestApplicationService_UpdateApplicationPolicy(t *testing.T) {
+	t.Run("UpdateApplicationPolicy_Success_DefaultGrantDuration", func(t *testing.T) {
+		db, mock, cleanup := SetupMockDB(t)
+		defer cleanup()
+
+		var capturedAllowList models.AllowListUpdateRequest
+		mockTransport := &MockRoundTripper{
+			RoundTripFunc: func(req *http.Request) (*http.Response, error) {
+				if req.Body != nil {
+					body, _ := io.ReadAll(req.Body)
+					_ = json.Unmarshal(body, &capturedAllowList)
+				}
+				return &http.Response{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(bytes.NewBufferString(`{"records": [{"id": "policy_1"}]}`)),
+					Header:     make(http.Header),
+				}, nil
+			},
+		}
+		pdpService := NewPDPService("http://mock-pdp")
+		pdpService.HTTPClient = &http.Client{Transport: mockTransport}
+
+		mockIDP := &MockIDP{}
+		service := NewApplicationService(db, pdpService, mockIDP)
+
+		clientID := "idp-client-123"
+		mock.ExpectQuery(`SELECT .*`).
+			WillReturnRows(sqlmock.NewRows([]string{"application_id", "application_name", "member_id", "version", "idp_client_id"}).
+				AddRow("app_123", "Test Application", "member-123", "v1", clientID))
+
+		mock.ExpectExec(`UPDATE "applications"`).
+			WillReturnResult(sqlmock.NewResult(0, 1))
+
+		req := &models.UpdateApplicationPolicyRequest{
+			SelectedFields: []models.SelectedFieldRecord{
+				{FieldName: "email", SchemaID: "schema-123"},
+			},
+		}
+
+		result, err := service.UpdateApplicationPolicy(context.Background(), "app_123", req)
+
+		assert.NoError(t, err)
+		assert.NotNil(t, result)
+		if result != nil {
+			assert.Equal(t, req.SelectedFields, []models.SelectedFieldRecord(result.SelectedFields))
+		}
+
+		// The allow-list is keyed by the IdP client_id, not the portal application ID.
+		assert.Equal(t, clientID, capturedAllowList.ApplicationID)
+		// GrantDuration defaults to one month when the request omits it.
+		assert.Equal(t, models.GrantDurationTypeOneMonth, capturedAllowList.GrantDuration)
+
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+
+	t.Run("UpdateApplicationPolicy_Success_ExplicitGrantDuration", func(t *testing.T) {
+		db, mock, cleanup := SetupMockDB(t)
+		defer cleanup()
+
+		var capturedAllowList models.AllowListUpdateRequest
+		mockTransport := &MockRoundTripper{
+			RoundTripFunc: func(req *http.Request) (*http.Response, error) {
+				if req.Body != nil {
+					body, _ := io.ReadAll(req.Body)
+					_ = json.Unmarshal(body, &capturedAllowList)
+				}
+				return &http.Response{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(bytes.NewBufferString(`{"records": [{"id": "policy_1"}]}`)),
+					Header:     make(http.Header),
+				}, nil
+			},
+		}
+		pdpService := NewPDPService("http://mock-pdp")
+		pdpService.HTTPClient = &http.Client{Transport: mockTransport}
+
+		mockIDP := &MockIDP{}
+		service := NewApplicationService(db, pdpService, mockIDP)
+
+		clientID := "idp-client-123"
+		mock.ExpectQuery(`SELECT .*`).
+			WillReturnRows(sqlmock.NewRows([]string{"application_id", "application_name", "member_id", "version", "idp_client_id"}).
+				AddRow("app_123", "Test Application", "member-123", "v1", clientID))
+
+		mock.ExpectExec(`UPDATE "applications"`).
+			WillReturnResult(sqlmock.NewResult(0, 1))
+
+		grantDuration := models.GrantDurationTypeOneYear
+		req := &models.UpdateApplicationPolicyRequest{
+			SelectedFields: []models.SelectedFieldRecord{
+				{FieldName: "email", SchemaID: "schema-123"},
+			},
+			GrantDuration: &grantDuration,
+		}
+
+		result, err := service.UpdateApplicationPolicy(context.Background(), "app_123", req)
+
+		assert.NoError(t, err)
+		assert.NotNil(t, result)
+		assert.Equal(t, models.GrantDurationTypeOneYear, capturedAllowList.GrantDuration)
+
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+
+	t.Run("UpdateApplicationPolicy_NotFound", func(t *testing.T) {
+		db, mock, cleanup := SetupMockDB(t)
+		defer cleanup()
+
+		pdpService := NewPDPService("http://mock-pdp")
+		mockIDP := &MockIDP{}
+		service := NewApplicationService(db, pdpService, mockIDP)
+
+		mock.ExpectQuery(`SELECT .*`).
+			WillReturnError(gorm.ErrRecordNotFound)
+
+		req := &models.UpdateApplicationPolicyRequest{
+			SelectedFields: []models.SelectedFieldRecord{
+				{FieldName: "email", SchemaID: "schema-123"},
+			},
+		}
+
+		result, err := service.UpdateApplicationPolicy(context.Background(), "non-existent-id", req)
+
+		assert.Error(t, err)
+		assert.Nil(t, result)
+		assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
+
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+
+	t.Run("UpdateApplicationPolicy_NilIdpClientID", func(t *testing.T) {
+		db, mock, cleanup := SetupMockDB(t)
+		defer cleanup()
+
+		pdpService := NewPDPService("http://mock-pdp")
+		mockIDP := &MockIDP{}
+		service := NewApplicationService(db, pdpService, mockIDP)
+
+		// idp_client_id column omitted -> IdpClientID stays nil
+		mock.ExpectQuery(`SELECT .*`).
+			WillReturnRows(sqlmock.NewRows([]string{"application_id", "application_name", "member_id", "version"}).
+				AddRow("app_123", "Test Application", "member-123", "v1"))
+
+		req := &models.UpdateApplicationPolicyRequest{
+			SelectedFields: []models.SelectedFieldRecord{
+				{FieldName: "email", SchemaID: "schema-123"},
+			},
+		}
+
+		result, err := service.UpdateApplicationPolicy(context.Background(), "app_123", req)
+
+		assert.Error(t, err)
+		assert.Nil(t, result)
+		assert.Contains(t, err.Error(), "IdpClientID is nil")
+
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+
+	t.Run("UpdateApplicationPolicy_PDPFailure_NoDBWrite", func(t *testing.T) {
+		db, mock, cleanup := SetupMockDB(t)
+		defer cleanup()
+
+		mockTransport := &MockRoundTripper{
+			RoundTripFunc: func(req *http.Request) (*http.Response, error) {
+				return &http.Response{
+					StatusCode: http.StatusInternalServerError,
+					Body:       io.NopCloser(bytes.NewBufferString(`{"error": "pdp error"}`)),
+					Header:     make(http.Header),
+				}, nil
+			},
+		}
+		pdpService := NewPDPService("http://mock-pdp")
+		pdpService.HTTPClient = &http.Client{Transport: mockTransport}
+
+		mockIDP := &MockIDP{}
+		service := NewApplicationService(db, pdpService, mockIDP)
+
+		clientID := "idp-client-123"
+		mock.ExpectQuery(`SELECT .*`).
+			WillReturnRows(sqlmock.NewRows([]string{"application_id", "application_name", "member_id", "version", "idp_client_id"}).
+				AddRow("app_123", "Test Application", "member-123", "v1", clientID))
+		// No ExpectExec for UPDATE: a failed PDP call must not touch the DB.
+
+		req := &models.UpdateApplicationPolicyRequest{
+			SelectedFields: []models.SelectedFieldRecord{
+				{FieldName: "email", SchemaID: "schema-123"},
+			},
+		}
+
+		result, err := service.UpdateApplicationPolicy(context.Background(), "app_123", req)
+
+		assert.Error(t, err)
+		assert.Nil(t, result)
+		assert.Contains(t, err.Error(), "failed to update allow list")
+
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+}
+
 func TestApplicationService_GetApplication(t *testing.T) {
 	t.Run("GetApplication_Success", func(t *testing.T) {
 		db, mock, cleanup := SetupMockDB(t)

@@ -5,8 +5,8 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/openndx/openndx-core/internal/pb/v1/models"
 	"github.com/google/uuid"
+	"github.com/openndx/openndx-core/internal/pb/v1/models"
 	"gorm.io/gorm"
 )
 

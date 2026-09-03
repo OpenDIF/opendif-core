@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -280,6 +281,53 @@ func createTestApplication(t *testing.T, db *gorm.DB, memberID string) string {
 	}
 
 	return application.ApplicationID
+}
+
+// createTestApplicationWithClientID creates an application with a given IdP client ID,
+// needed for policy-update tests since the PDP allow-list is keyed on it.
+func createTestApplicationWithClientID(t *testing.T, db *gorm.DB, memberID, idpClientID string) string {
+	selectedFields := models.SelectedFieldRecords{
+		{FieldName: "field1", SchemaID: "schema-123"},
+	}
+	application := models.Application{
+		ApplicationID:   "app_" + fmt.Sprintf("%d", time.Now().UnixNano()),
+		ApplicationName: "Test Application",
+		SelectedFields:  selectedFields,
+		MemberID:        memberID,
+		Version:         "1.0.0",
+		IdpClientID:     &idpClientID,
+	}
+
+	err := db.Create(&application).Error
+	if err != nil {
+		t.Fatalf("Failed to create application: %v. ApplicationID: %s, MemberID: %s", err, application.ApplicationID, memberID)
+	}
+
+	return application.ApplicationID
+}
+
+// newTestV1HandlerWithWorkingPDP builds a V1Handler whose PDP service is backed by an
+// in-process mock transport (unlike NewTestV1HandlerWithMockPDP, which points at an
+// unreachable localhost address), so tests can exercise the full allow-list update path.
+func newTestV1HandlerWithWorkingPDP(t *testing.T, db *gorm.DB, pdpStatusCode int, pdpBody string) *V1Handler {
+	mockTransport := &services.MockRoundTripper{
+		RoundTripFunc: func(req *http.Request) (*http.Response, error) {
+			return &http.Response{
+				StatusCode: pdpStatusCode,
+				Body:       io.NopCloser(bytes.NewBufferString(pdpBody)),
+				Header:     make(http.Header),
+			}, nil
+		},
+	}
+	pdpService := services.NewPDPService("http://mock-pdp")
+	pdpService.HTTPClient = &http.Client{Transport: mockTransport}
+
+	mockIDP := new(MockIdentityProviderAPI)
+	return &V1Handler{
+		memberService:      services.NewMemberService(db, mockIDP),
+		schemaService:      services.NewSchemaService(db, pdpService),
+		applicationService: services.NewApplicationService(db, pdpService, mockIDP),
+	}
 }
 
 // TestMemberEndpoints tests all member-related endpoints
@@ -867,6 +915,122 @@ func TestApplicationEndpoints(t *testing.T) {
 
 	t.Run("Method Not Allowed - Applications", func(t *testing.T) {
 		httpReq := NewAdminRequest(http.MethodDelete, "/api/v1/applications", nil)
+		w := httptest.NewRecorder()
+		mux := http.NewServeMux()
+		testHandler.handler.SetupV1Routes(mux)
+		mux.ServeHTTP(w, httpReq)
+
+		assert.Equal(t, http.StatusMethodNotAllowed, w.Code)
+	})
+}
+
+// TestApplicationPolicyEndpoint tests PUT /api/v1/applications/:applicationId/policy
+func TestApplicationPolicyEndpoint(t *testing.T) {
+	t.Run("PUT /api/v1/applications/:id/policy - Success", func(t *testing.T) {
+		db := services.SetupSQLiteTestDB(t)
+		if db == nil {
+			t.Skip("Skipping test: database connection failed")
+			return
+		}
+		handler := newTestV1HandlerWithWorkingPDP(t, db, http.StatusOK, `{"records": [{"id": "policy_1"}]}`)
+
+		memberID := createTestMember(t, db, fmt.Sprintf("policy-success-%d@example.com", time.Now().UnixNano()))
+		applicationID := createTestApplicationWithClientID(t, db, memberID, "idp-client-abc")
+
+		req := models.UpdateApplicationPolicyRequest{
+			SelectedFields: []models.SelectedFieldRecord{
+				{FieldName: "email", SchemaID: "schema-456"},
+			},
+		}
+		reqBody, _ := json.Marshal(req)
+		httpReq := NewAdminRequest(http.MethodPut, fmt.Sprintf("/api/v1/applications/%s/policy", applicationID), bytes.NewBuffer(reqBody))
+		httpReq.Header.Set("Content-Type", "application/json")
+
+		w := httptest.NewRecorder()
+		mux := http.NewServeMux()
+		handler.SetupV1Routes(mux)
+		mux.ServeHTTP(w, httpReq)
+
+		if w.Code != http.StatusOK {
+			t.Fatalf("Expected status 200, got %d. Response body: %s", w.Code, w.Body.String())
+		}
+
+		var response models.ApplicationResponse
+		err := json.Unmarshal(w.Body.Bytes(), &response)
+		assert.NoError(t, err)
+		assert.Equal(t, applicationID, response.ApplicationID)
+		assert.Equal(t, req.SelectedFields, []models.SelectedFieldRecord(response.SelectedFields))
+	})
+
+	t.Run("PUT /api/v1/applications/:id/policy - PDPFailure", func(t *testing.T) {
+		db := services.SetupSQLiteTestDB(t)
+		if db == nil {
+			t.Skip("Skipping test: database connection failed")
+			return
+		}
+		handler := newTestV1HandlerWithWorkingPDP(t, db, http.StatusInternalServerError, `{"error": "pdp error"}`)
+
+		memberID := createTestMember(t, db, fmt.Sprintf("policy-failure-%d@example.com", time.Now().UnixNano()))
+		applicationID := createTestApplicationWithClientID(t, db, memberID, "idp-client-abc")
+
+		req := models.UpdateApplicationPolicyRequest{
+			SelectedFields: []models.SelectedFieldRecord{
+				{FieldName: "email", SchemaID: "schema-456"},
+			},
+		}
+		reqBody, _ := json.Marshal(req)
+		httpReq := NewAdminRequest(http.MethodPut, fmt.Sprintf("/api/v1/applications/%s/policy", applicationID), bytes.NewBuffer(reqBody))
+		httpReq.Header.Set("Content-Type", "application/json")
+
+		w := httptest.NewRecorder()
+		mux := http.NewServeMux()
+		handler.SetupV1Routes(mux)
+		mux.ServeHTTP(w, httpReq)
+
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+	})
+
+	testHandler := NewTestV1Handler(t)
+	if testHandler == nil {
+		t.Skip("Skipping test: database connection failed")
+		return
+	}
+
+	t.Run("PUT /api/v1/applications/:id/policy - NotFound", func(t *testing.T) {
+		req := models.UpdateApplicationPolicyRequest{
+			SelectedFields: []models.SelectedFieldRecord{
+				{FieldName: "email", SchemaID: "schema-456"},
+			},
+		}
+		reqBody, _ := json.Marshal(req)
+		httpReq := NewAdminRequest(http.MethodPut, "/api/v1/applications/non-existent-id/policy", bytes.NewBuffer(reqBody))
+		httpReq.Header.Set("Content-Type", "application/json")
+
+		w := httptest.NewRecorder()
+		mux := http.NewServeMux()
+		testHandler.handler.SetupV1Routes(mux)
+		mux.ServeHTTP(w, httpReq)
+
+		assert.Equal(t, http.StatusNotFound, w.Code)
+	})
+
+	t.Run("PUT /api/v1/applications/:id/policy - Invalid JSON", func(t *testing.T) {
+		memberID := createTestMember(t, testHandler.db, fmt.Sprintf("policy-invalidjson-%d@example.com", time.Now().UnixNano()))
+		applicationID := createTestApplication(t, testHandler.db, memberID)
+
+		httpReq := NewAdminRequest(http.MethodPut, fmt.Sprintf("/api/v1/applications/%s/policy", applicationID), bytes.NewBufferString("invalid json"))
+		httpReq.Header.Set("Content-Type", "application/json")
+
+		w := httptest.NewRecorder()
+		mux := http.NewServeMux()
+		testHandler.handler.SetupV1Routes(mux)
+		mux.ServeHTTP(w, httpReq)
+
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+	})
+
+	t.Run("Method Not Allowed - Application Policy", func(t *testing.T) {
+		httpReq := NewAdminRequest(http.MethodGet, "/api/v1/applications/some-id/policy", nil)
 		w := httptest.NewRecorder()
 		mux := http.NewServeMux()
 		testHandler.handler.SetupV1Routes(mux)
