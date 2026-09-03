@@ -3,6 +3,7 @@ package middleware
 import (
 	"context"
 	"crypto/rsa"
+	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -56,6 +57,11 @@ type JWTAuthConfig struct {
 	ExpectedIssuer string
 	ValidClientIDs []string // Multiple valid client IDs for different portals
 	Timeout        time.Duration
+	// JWKSInsecureSkipVerify disables TLS certificate verification when
+	// fetching the JWKS. Local-dev only (e.g. ThunderID's self-signed cert,
+	// see consent-engine's IDP_JWKS_INSECURE_SKIP_VERIFY for the same need) —
+	// never enable against a real deployment.
+	JWKSInsecureSkipVerify bool
 }
 
 // Validate checks if the JWT configuration is valid
@@ -89,14 +95,19 @@ func NewJWTAuthMiddleware(config JWTAuthConfig) *JWTAuthMiddleware {
 		timeout = 10 * time.Second
 	}
 
+	httpClient := &http.Client{Timeout: timeout}
+	if config.JWKSInsecureSkipVerify {
+		httpClient.Transport = &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, //nolint:gosec // opt-in local-dev flag only
+		}
+	}
+
 	return &JWTAuthMiddleware{
 		jwksURL:        config.JWKSURL,
 		expectedIssuer: config.ExpectedIssuer,
 		validClientIDs: config.ValidClientIDs,
-		httpClient: &http.Client{
-			Timeout: timeout,
-		},
-		keys: make(map[string]*rsa.PublicKey),
+		httpClient:     httpClient,
+		keys:           make(map[string]*rsa.PublicKey),
 	}
 }
 

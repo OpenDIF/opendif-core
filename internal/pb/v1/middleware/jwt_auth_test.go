@@ -108,6 +108,69 @@ func TestJWTAuthConfig_Validate(t *testing.T) {
 	}
 }
 
+func TestJWTAuthMiddleware_JWKSInsecureSkipVerify(t *testing.T) {
+	privKey, pubKey := generateTestKeys(t)
+	kid := "test-key-1"
+
+	// A TLS server with a self-signed cert, standing in for ThunderID's dev cert.
+	jwksServer := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write(createJWKSResponse(t, pubKey, kid))
+	}))
+	defer jwksServer.Close()
+
+	token := jwt.NewWithClaims(jwt.SigningMethodRS256, jwt.MapClaims{
+		"iss":       "https://example.com",
+		"aud":       "client-1",
+		"email":     "ndx-admin@openndx.local",
+		"sub":       "user-1",
+		"exp":       time.Now().Add(time.Hour).Unix(),
+		"iat":       time.Now().Unix(),
+		"client_id": "client-1",
+		"username":  "ndx-admin",
+		"roles":     []string{"OpenNDX_Admin"},
+	})
+	token.Header["kid"] = kid
+	tokenString, err := token.SignedString(privKey)
+	require.NoError(t, err)
+
+	newRequest := func() *http.Request {
+		req := httptest.NewRequest("GET", "/api/v1/resource", nil)
+		req.Header.Set("Authorization", "Bearer "+tokenString)
+		return req
+	}
+
+	t.Run("fails without skip-verify against a self-signed JWKS server", func(t *testing.T) {
+		middleware := NewJWTAuthMiddleware(JWTAuthConfig{
+			JWKSURL:        jwksServer.URL,
+			ExpectedIssuer: "https://example.com",
+			ValidClientIDs: []string{"client-1"},
+		})
+
+		rr := httptest.NewRecorder()
+		middleware.AuthenticateJWT(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+		})).ServeHTTP(rr, newRequest())
+
+		assert.Equal(t, http.StatusUnauthorized, rr.Code)
+	})
+
+	t.Run("succeeds with skip-verify against a self-signed JWKS server", func(t *testing.T) {
+		middleware := NewJWTAuthMiddleware(JWTAuthConfig{
+			JWKSURL:                jwksServer.URL,
+			ExpectedIssuer:         "https://example.com",
+			ValidClientIDs:         []string{"client-1"},
+			JWKSInsecureSkipVerify: true,
+		})
+
+		rr := httptest.NewRecorder()
+		middleware.AuthenticateJWT(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+		})).ServeHTTP(rr, newRequest())
+
+		assert.Equal(t, http.StatusOK, rr.Code)
+	})
+}
+
 func TestJWTAuthMiddleware_AuthenticateJWT(t *testing.T) {
 	privKey, pubKey := generateTestKeys(t)
 	kid := "test-key-1"
