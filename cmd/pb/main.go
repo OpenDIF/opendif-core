@@ -98,10 +98,11 @@ func main() {
 	}
 
 	jwtConfig := v1middleware.JWTAuthConfig{
-		JWKSURL:        utils.GetEnvOrDefault("IDP_JWKS_URL", idpBaseURL+"/oauth2/jwks"),
-		ExpectedIssuer: utils.GetEnvOrDefault("IDP_ISSUER", utils.GetEnvOrDefault("IDP_TOKEN_URL", idpBaseURL+"/oauth2/token")),
-		ValidClientIDs: validClientIDs,
-		Timeout:        10 * time.Second,
+		JWKSURL:                utils.GetEnvOrDefault("IDP_JWKS_URL", idpBaseURL+"/oauth2/jwks"),
+		ExpectedIssuer:         utils.GetEnvOrDefault("IDP_ISSUER", utils.GetEnvOrDefault("IDP_TOKEN_URL", idpBaseURL+"/oauth2/token")),
+		ValidClientIDs:         validClientIDs,
+		Timeout:                10 * time.Second,
+		JWKSInsecureSkipVerify: utils.GetEnvOrDefault("IDP_JWKS_INSECURE_SKIP_VERIFY", "false") == "true",
 	}
 
 	// Validate JWT configuration before proceeding
