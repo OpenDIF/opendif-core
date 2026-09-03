@@ -14,10 +14,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/golang-jwt/jwt/v5"
 	sharedutils "github.com/openndx/openndx-core/internal/pb/shared/utils"
 	"github.com/openndx/openndx-core/internal/pb/v1/models"
 	authutils "github.com/openndx/openndx-core/internal/pb/v1/utils"
-	"github.com/golang-jwt/jwt/v5"
 )
 
 // JWKS represents the JSON Web Key Set structure

@@ -318,6 +318,17 @@ func (h *V1Handler) handleApplications(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Handle policy sub-resource: PUT /api/v1/applications/:applicationId/policy
+	if len(parts) == 2 && parts[1] == "policy" {
+		switch r.Method {
+		case http.MethodPut:
+			h.updateApplicationPolicy(w, r, applicationId)
+		default:
+			utils.RespondWithError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		}
+		return
+	}
+
 	utils.RespondWithError(w, http.StatusNotFound, "Endpoint not found")
 }
 
@@ -1286,6 +1297,64 @@ func (h *V1Handler) updateApplication(w http.ResponseWriter, r *http.Request, ap
 	}
 
 	application, err := h.applicationService.UpdateApplication(r.Context(), applicationId, &req)
+	if err != nil {
+		// Log audit event for failure
+		middleware.LogAuditEvent(r, string(models.ResourceTypeApplications), &existingApplication.ApplicationID, string(models.AuditStatusFailure))
+
+		utils.RespondWithError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	// Log audit event
+	middleware.LogAuditEvent(r, string(models.ResourceTypeApplications), &application.ApplicationID, string(models.AuditStatusSuccess))
+
+	utils.RespondWithSuccess(w, http.StatusOK, application)
+}
+
+func (h *V1Handler) updateApplicationPolicy(w http.ResponseWriter, r *http.Request, applicationId string) {
+	// Get authenticated user
+	user, err := middleware.GetUserFromRequest(r)
+	if err != nil {
+		utils.RespondWithError(w, http.StatusUnauthorized, "Authentication required")
+		return
+	}
+
+	// Check permission - policy updates share the application:update permission
+	if !user.HasPermission(models.PermissionUpdateApplication) {
+		utils.RespondWithError(w, http.StatusForbidden, "Insufficient permissions")
+		return
+	}
+
+	// Get existing application to check ownership
+	existingApplication, err := h.applicationService.GetApplication(r.Context(), applicationId)
+	if err != nil {
+		utils.RespondWithError(w, http.StatusNotFound, err.Error())
+		return
+	}
+
+	// For non-admin users, check ownership
+	if !user.IsAdmin() {
+		// Get member ID for the authenticated user (cached)
+		userMemberID, err := h.getUserMemberID(r, user)
+		if err != nil {
+			utils.RespondWithError(w, http.StatusForbidden, "User member record not found")
+			return
+		}
+
+		// Check if application belongs to the user
+		if existingApplication.MemberID != userMemberID {
+			utils.RespondWithError(w, http.StatusForbidden, "Access denied to update this resource")
+			return
+		}
+	}
+
+	var req models.UpdateApplicationPolicyRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		utils.RespondWithError(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	application, err := h.applicationService.UpdateApplicationPolicy(r.Context(), applicationId, &req)
 	if err != nil {
 		// Log audit event for failure
 		middleware.LogAuditEvent(r, string(models.ResourceTypeApplications), &existingApplication.ApplicationID, string(models.AuditStatusFailure))

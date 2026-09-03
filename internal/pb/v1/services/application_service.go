@@ -7,9 +7,9 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/openndx/openndx-core/internal/pb/idp"
 	"github.com/openndx/openndx-core/internal/pb/v1/models"
-	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
@@ -181,6 +181,54 @@ func (s *ApplicationService) UpdateApplication(ctx context.Context, applicationI
 	}
 	if application.ApplicationDescription != nil && *application.ApplicationDescription != "" {
 		response.ApplicationDescription = application.ApplicationDescription
+	}
+
+	return response, nil
+}
+
+// UpdateApplicationPolicy replaces an existing application's allow-list in the PDP and
+// persists the resulting selected fields on the application record.
+func (s *ApplicationService) UpdateApplicationPolicy(ctx context.Context, applicationID string, req *models.UpdateApplicationPolicyRequest) (*models.ApplicationResponse, error) {
+	var application models.Application
+	if err := s.db.WithContext(ctx).First(&application, "application_id = ?", applicationID).Error; err != nil {
+		return nil, err
+	}
+
+	if application.IdpClientID == nil {
+		return nil, fmt.Errorf("cannot update policy: application IdpClientID is nil")
+	}
+
+	grantDuration := models.GrantDurationTypeOneMonth
+	if req.GrantDuration != nil {
+		grantDuration = *req.GrantDuration
+	}
+
+	policyReq := models.AllowListUpdateRequest{
+		ApplicationID: *application.IdpClientID,
+		Records:       req.SelectedFields,
+		GrantDuration: grantDuration,
+	}
+
+	if _, err := s.policyService.UpdateAllowList(policyReq); err != nil {
+		return nil, fmt.Errorf("failed to update allow list: %w", err)
+	}
+
+	application.SelectedFields = models.SelectedFieldRecords(req.SelectedFields)
+	if err := s.db.WithContext(ctx).Save(&application).Error; err != nil {
+		return nil, fmt.Errorf("failed to persist updated selected fields: %w", err)
+	}
+
+	response := &models.ApplicationResponse{
+		ApplicationID:          application.ApplicationID,
+		ApplicationName:        application.ApplicationName,
+		ApplicationDescription: application.ApplicationDescription,
+		SelectedFields:         application.SelectedFields,
+		MemberID:               application.MemberID,
+		Version:                application.Version,
+		IdpApplicationID:       application.IdpApplicationID,
+		IdpClientID:            application.IdpClientID,
+		CreatedAt:              application.CreatedAt.Format(time.RFC3339),
+		UpdatedAt:              application.UpdatedAt.Format(time.RFC3339),
 	}
 
 	return response, nil
