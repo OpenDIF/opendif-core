@@ -1,0 +1,6 @@
+# File: cors.yaml
+resource_type: server_config
+name: cors
+value:
+  allowedOrigins:
+    - http://localhost:5173

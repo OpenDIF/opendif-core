@@ -16,16 +16,17 @@ services:
     environment:
       - POSTGRES_USER=${DB_USER:-exchange}
       - POSTGRES_PASSWORD=${DB_PASSWORD:-exchange}
-      # Default database; the additional per-service databases are created
-      # by init-db.sql on first startup.
-      - POSTGRES_DB=${DB_USER:-exchange}
+      # Just the server's initial connection database — postgres requires one.
+      # The actual per-service databases (pdp, consent_engine, orchestration_engine,
+      # audit) are hardcoded and created separately by init-db.sql on first startup.
+      - POSTGRES_DB=postgres
     ports:
       - "${PORT_DB:-5432}:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
       - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-exchange}"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-exchange} ${DB_NAME:-postgres}"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -33,6 +34,72 @@ services:
     restart: unless-stopped
     networks:
       - openndx-network
+
+  # -------------------------------------------------------------------
+  # 2. Identity Provider Core Services (Thunder Stack)
+  # -------------------------------------------------------------------
+  # Stage A: Seed static database schemas from container image layer
+  thunderid-db-init:
+    image: ghcr.io/thunder-id/thunderid:1.0.1
+    container_name: ndx-thunderid-db-init
+    # Seed only when the volume is empty. An unconditional copy would overwrite
+    # configdb.db on every `up`, silently reverting the bootstrap and seed.
+    command: sh -c '[ -f /data/configdb.db ] || cp -r /opt/thunderid/database/* /data/'
+    volumes:
+      - thunderid-db:/data
+    restart: "no"
+
+  # Stage B: generate key material, then import the declarative bootstrap resources
+  # (the image's built-in defaults plus our own user/resource/application files below).
+  thunderid-setup:
+    image: ghcr.io/thunder-id/thunderid:1.0.1
+    container_name: ndx-thunderid-setup
+    command: ./setup.sh
+    networks:
+      - openndx-network
+    environment:
+      - PUBLIC_URL=${IDP_PUBLIC_URL:-https://localhost:8090}
+      - CONSENT_PORTAL_URL=${CONSENT_PORTAL_URL:-http://localhost:5173}
+      - DATA_CONSUMER_CLIENT_SECRET=${DATA_CONSUMER_CLIENT_SECRET:-1234}
+      - ADMIN_PASSWORD=${IDP_ADMIN_PASSWORD:-1234}
+    volumes:
+      - thunderid-db:/opt/thunderid/database
+      # Generated here, so must outlive this container.
+      - thunderid-certs:/opt/thunderid/config/certs
+      - thunderid-secrets:/opt/thunderid/config/secrets
+      - ./thunderid/deployment.yaml:/opt/thunderid/deployment.yaml
+      - ./thunderid/bootstrap/users.yaml:/opt/thunderid/bootstrap/02-users.yaml
+      - ./thunderid/bootstrap/resource.yaml:/opt/thunderid/bootstrap/03-resource.yaml
+      - ./thunderid/bootstrap/application.yaml:/opt/thunderid/bootstrap/04-application.yaml
+      - ./thunderid/bootstrap/cors.yaml:/opt/thunderid/bootstrap/05-cors.yaml
+    depends_on:
+      thunderid-db-init:
+        condition: service_completed_successfully
+    restart: "no"
+
+  # Stage C: Boot active server instances listening for authentication queries
+  thunderid:
+    image: ghcr.io/thunder-id/thunderid:1.0.1
+    container_name: ndx-thunderid
+    networks:
+      - openndx-network
+    ports:
+      - "8090:8090"
+    volumes:
+      - thunderid-db:/opt/thunderid/database
+      # Read-only: consume the key material Stage B generated, never regenerate it.
+      - thunderid-certs:/opt/thunderid/config/certs:ro
+      - thunderid-secrets:/opt/thunderid/config/secrets:ro
+      - ./thunderid/deployment.yaml:/opt/thunderid/deployment.yaml
+    healthcheck:
+      test: [ "CMD-SHELL", "curl -fsk -o /dev/null https://localhost:8090/health/readiness || exit 1" ]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 15s
+    depends_on:
+      thunderid-setup:
+        condition: service_completed_successfully
 
   policy-decision-point:
     build:
@@ -59,6 +126,11 @@ services:
       - DB_PASSWORD=${DB_PASSWORD:-exchange}
       - DB_NAME=${DB_NAME_PDP:-pdp}
       - DB_SSLMODE=${DB_SSLMODE:-disable}
+      # IDP_AUDIENCE here is the OE resource server's identifier — kept separate
+      # from consent-engine's CONSENT_ENGINE_AUDIENCE, see resource.yaml.
+      - IDP_ISSUER=${IDP_PUBLIC_URL:-}
+      - IDP_AUDIENCE=${IDP_AUDIENCE:-}
+      - IDP_JWKS_URL=${IDP_JWKS_URL:-}
       - RUN_MIGRATION=${RUN_MIGRATION:-true}
     depends_on:
       postgres:
@@ -85,9 +157,12 @@ services:
       - LOG_FORMAT=${LOG_FORMAT:-text}
       - CONSENT_PORTAL_URL=${CONSENT_PORTAL_URL:-http://localhost:5173}
       # IDP configuration (JWT verification for portal endpoints)
-      - IDP_ISSUER=${IDP_ISSUER:-}
-      - IDP_AUDIENCE=${IDP_AUDIENCE:-}
-      - IDP_CLIENT_ID=${IDP_CLIENT_ID:-}
+      # Deliberately its own audience, distinct from OE/PDP's IDP_AUDIENCE — see
+      # thunderid/bootstrap/resource.yaml for why sharing one would let a token
+      # minted for one API be replayed against the other.
+      - IDP_ISSUER=${IDP_PUBLIC_URL:-}
+      - IDP_AUDIENCE=${CONSENT_ENGINE_AUDIENCE:-}
+      - IDP_CLIENT_ID=${CONSENT_PORTAL_CLIENT_ID:-}
       - IDP_JWKS_URL=${IDP_JWKS_URL:-}
       - IDP_JWKS_INSECURE_SKIP_VERIFY=${IDP_JWKS_INSECURE_SKIP_VERIFY:-false}
       # Database configuration
@@ -179,6 +254,16 @@ services:
 
 volumes:
   postgres-data:
+    driver: local
+  thunderid-db:
+    driver: local
+  # Key material is generated per deployment, not shipped in the image. Without these
+  # volumes the server regenerates a different AES key and cannot decrypt the client
+  # secrets already stored in configdb.db.
+  thunderid-certs:
+    driver: local
+  thunderid-secrets:
+    driver: local
 
 networks:
   openndx-network:

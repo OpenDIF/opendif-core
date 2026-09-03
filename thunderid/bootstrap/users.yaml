@@ -1,0 +1,16 @@
+# LOCAL-DEV ONLY: a sample citizen/data-owner account for testing the consent
+# portal's login and self-service flows without registering through the UI first.
+resource_type: user
+id: 01900000-0000-7000-8000-000000000031
+type: Person
+ouHandle: default
+attributes:
+  username: suresh
+  sub: suresh
+  email: suresh@citizen.fl
+  name: Suresh Fernando
+  given_name: Suresh
+  family_name: Fernando
+  mobile_number: "+234564444456"
+credentials:
+  password: "Test@1234"
