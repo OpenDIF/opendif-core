@@ -33,15 +33,28 @@ func NewPDPService(baseURL string) *PDPService {
 	}
 }
 
-// CreatePolicyMetadata sends a request to create policy metadata in the PDP
+// CreatePolicyMetadata sends a request to create policy metadata in the PDP,
+// parsing the field records out of a GraphQL SDL string.
 func (s *PDPService) CreatePolicyMetadata(schemaId string, sdl string) (*models.PolicyMetadataCreateResponse, error) {
-	// parse SDL and create policy metadata request
 	handler := utils.NewGraphQLHandler()
 	policyRequest, err := handler.ParseSDLToPolicyRequest(schemaId, sdl)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse SDL: %w", err)
 	}
+	return s.createPolicyMetadata(policyRequest)
+}
 
+// CreatePolicyMetadataFromRecords sends a request to create policy metadata
+// in the PDP from caller-supplied records directly, skipping SDL/GraphQL
+// parsing entirely.
+func (s *PDPService) CreatePolicyMetadataFromRecords(schemaId string, records []models.PolicyMetadataCreateRequestRecord) (*models.PolicyMetadataCreateResponse, error) {
+	return s.createPolicyMetadata(&models.PolicyMetadataCreateRequest{
+		SchemaID: schemaId,
+		Records:  records,
+	})
+}
+
+func (s *PDPService) createPolicyMetadata(policyRequest *models.PolicyMetadataCreateRequest) (*models.PolicyMetadataCreateResponse, error) {
 	// Marshal request to JSON
 	reqBody, err := json.Marshal(policyRequest)
 	if err != nil {
@@ -75,8 +88,10 @@ func (s *PDPService) CreatePolicyMetadata(schemaId string, sdl string) (*models.
 		return nil, fmt.Errorf("failed to read response body: %w", err)
 	}
 
-	// Check status code
-	if resp.StatusCode != http.StatusOK {
+	// Check status code. The PDP's CreatePolicyMetadata handler responds 201
+	// Created (it's a creation endpoint), not 200 - see
+	// internal/pdp/handler/handler.go.
+	if resp.StatusCode != http.StatusCreated {
 		slog.Error("PDP returned error", "status", resp.StatusCode, "body", string(respBody))
 		return nil, fmt.Errorf("PDP returned status %d: %s", resp.StatusCode, string(respBody))
 	}
@@ -87,7 +102,7 @@ func (s *PDPService) CreatePolicyMetadata(schemaId string, sdl string) (*models.
 		return nil, fmt.Errorf("failed to parse response: %w", err)
 	}
 
-	slog.Info("Successfully created policy metadata in PDP", "schemaId", schemaId, "recordsCreated", len(response.Records))
+	slog.Info("Successfully created policy metadata in PDP", "schemaId", policyRequest.SchemaID, "recordsCreated", len(response.Records))
 	return &response, nil
 }
 

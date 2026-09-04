@@ -21,8 +21,16 @@ func NewSchemaService(db *gorm.DB, policyService *PDPService) *SchemaService {
 	return &SchemaService{db: db, policyService: policyService}
 }
 
-// CreateSchema creates a new schema
+// CreateSchema creates a new schema. Exactly one of req.SDL / req.Fields must
+// be set: SDL is parsed into policy metadata records via GraphQL directives,
+// while Fields are used directly, skipping that parsing entirely.
 func (s *SchemaService) CreateSchema(req *models.CreateSchemaRequest) (*models.SchemaResponse, error) {
+	hasSDL := req.SDL != ""
+	hasFields := len(req.Fields) > 0
+	if hasSDL == hasFields {
+		return nil, fmt.Errorf("exactly one of sdl or fields must be provided")
+	}
+
 	schema := models.Schema{
 		SchemaID:   "sch_" + uuid.New().String(),
 		SchemaName: req.SchemaName,
@@ -41,7 +49,12 @@ func (s *SchemaService) CreateSchema(req *models.CreateSchemaRequest) (*models.S
 	}
 
 	// Step 2: Create policy metadata in PDP (Saga Pattern)
-	_, err := s.policyService.CreatePolicyMetadata(schema.SchemaID, schema.SDL)
+	var err error
+	if hasFields {
+		_, err = s.policyService.CreatePolicyMetadataFromRecords(schema.SchemaID, req.Fields)
+	} else {
+		_, err = s.policyService.CreatePolicyMetadata(schema.SchemaID, schema.SDL)
+	}
 	if err != nil {
 		// Compensation: Delete the schema we just created
 		if deleteErr := s.db.Delete(&schema).Error; deleteErr != nil {
