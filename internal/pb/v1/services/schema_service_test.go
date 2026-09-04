@@ -14,6 +14,91 @@ import (
 	"gorm.io/gorm"
 )
 
+func TestSchemaService_CreateSchema_WithFields(t *testing.T) {
+	t.Run("Success_SkipsSDLParsing", func(t *testing.T) {
+		db, mock, cleanup := SetupMockDB(t)
+		defer cleanup()
+
+		var capturedBody []byte
+		mockTransport := &MockRoundTripper{
+			RoundTripFunc: func(req *http.Request) (*http.Response, error) {
+				capturedBody, _ = io.ReadAll(req.Body)
+				return &http.Response{
+					StatusCode: http.StatusCreated, // PDP's CreatePolicyMetadata handler returns 201
+					Body:       io.NopCloser(bytes.NewBufferString(`{"records": [{"id": "record-1", "fieldName": "email"}]}`)),
+					Header:     make(http.Header),
+				}, nil
+			},
+		}
+		pdpService := NewPDPService("http://mock-pdp")
+		pdpService.HTTPClient = &http.Client{Transport: mockTransport}
+
+		service := NewSchemaService(db, pdpService)
+
+		mock.ExpectQuery(`INSERT INTO "schemas"`).
+			WillReturnRows(sqlmock.NewRows([]string{"schema_id"}).AddRow("sch_123"))
+
+		req := &models.CreateSchemaRequest{
+			SchemaName: "Direct Fields Schema",
+			Endpoint:   "http://example.com/graphql",
+			MemberID:   "member-123",
+			Fields: []models.PolicyMetadataCreateRequestRecord{
+				{FieldName: "email", Source: models.SourcePrimary, AccessControlType: models.AccessControlTypePublic},
+			},
+		}
+
+		resp, err := service.CreateSchema(req)
+
+		assert.NoError(t, err)
+		assert.NotNil(t, resp)
+
+		// The record's fieldName must be forwarded exactly as given - no
+		// typename-prefix mangling the way SDL parsing would produce.
+		assert.Contains(t, string(capturedBody), `"fieldName":"email"`)
+
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+
+	t.Run("PDPFailure_Compensation", func(t *testing.T) {
+		db, mock, cleanup := SetupMockDB(t)
+		defer cleanup()
+
+		mockTransport := &MockRoundTripper{
+			RoundTripFunc: func(req *http.Request) (*http.Response, error) {
+				return &http.Response{
+					StatusCode: http.StatusBadRequest,
+					Body:       io.NopCloser(bytes.NewBufferString(`{"error": "invalid record"}`)),
+					Header:     make(http.Header),
+				}, nil
+			},
+		}
+		pdpService := NewPDPService("http://mock-pdp")
+		pdpService.HTTPClient = &http.Client{Transport: mockTransport}
+
+		service := NewSchemaService(db, pdpService)
+
+		mock.ExpectQuery(`INSERT INTO "schemas"`).
+			WillReturnRows(sqlmock.NewRows([]string{"schema_id"}).AddRow("sch_123"))
+		mock.ExpectExec(`DELETE FROM "schemas"`).
+			WillReturnResult(sqlmock.NewResult(0, 1))
+
+		req := &models.CreateSchemaRequest{
+			SchemaName: "Direct Fields Schema",
+			Endpoint:   "http://example.com/graphql",
+			MemberID:   "member-123",
+			Fields: []models.PolicyMetadataCreateRequestRecord{
+				{FieldName: "email", Source: models.SourcePrimary, AccessControlType: models.AccessControlTypePublic},
+			},
+		}
+
+		resp, err := service.CreateSchema(req)
+
+		assert.Error(t, err)
+		assert.Nil(t, resp)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+}
+
 func TestSchemaService_UpdateSchema(t *testing.T) {
 	t.Run("UpdateSchema_Success", func(t *testing.T) {
 		db, mock, cleanup := SetupMockDB(t)
@@ -479,43 +564,47 @@ func TestSchemaService_GetSchemaSubmissions(t *testing.T) {
 }
 
 func TestSchemaService_CreateSchema_EdgeCases(t *testing.T) {
-	t.Run("CreateSchema_EmptySDL", func(t *testing.T) {
+	t.Run("CreateSchema_EmptySDLAndNoFields", func(t *testing.T) {
 		db, mock, cleanup := SetupMockDB(t)
 		defer cleanup()
 
-		// Mock PDP failure (empty SDL will fail validation or PDP call)
-		mockTransport := &MockRoundTripper{
-			RoundTripFunc: func(req *http.Request) (*http.Response, error) {
-				return &http.Response{
-					StatusCode: http.StatusBadRequest,
-					Body:       io.NopCloser(bytes.NewBufferString(`{"error": "invalid SDL"}`)),
-					Header:     make(http.Header),
-				}, nil
-			},
-		}
 		pdpService := NewPDPService("http://mock-pdp")
-		pdpService.HTTPClient = &http.Client{Transport: mockTransport}
-
 		service := NewSchemaService(db, pdpService)
-
-		// Mock: Create schema (will succeed, then PDP fails)
-		mock.ExpectQuery(`INSERT INTO "schemas"`).
-			WillReturnRows(sqlmock.NewRows([]string{"schema_id"}).AddRow("sch_123"))
-
-		// Mock: Compensation - delete schema
-		mock.ExpectExec(`DELETE FROM "schemas"`).
-			WillReturnResult(sqlmock.NewResult(0, 1))
 
 		req := &models.CreateSchemaRequest{
 			SchemaName: "Test Schema",
 			SDL:        "",
 		}
 
+		// Neither sdl nor fields provided - must fail validation before
+		// touching the database or PDP at all.
 		_, err := service.CreateSchema(req)
 
-		// Should fail validation or PDP call
 		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "exactly one of sdl or fields must be provided")
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
 
+	t.Run("CreateSchema_BothSDLAndFieldsProvided", func(t *testing.T) {
+		db, mock, cleanup := SetupMockDB(t)
+		defer cleanup()
+
+		pdpService := NewPDPService("http://mock-pdp")
+		service := NewSchemaService(db, pdpService)
+
+		req := &models.CreateSchemaRequest{
+			SchemaName: "Test Schema",
+			SDL:        "type Query { test: String }",
+			Fields: []models.PolicyMetadataCreateRequestRecord{
+				{FieldName: "email", AccessControlType: models.AccessControlTypePublic, Source: models.SourcePrimary},
+			},
+		}
+
+		// Providing both is ambiguous and must also fail validation upfront.
+		_, err := service.CreateSchema(req)
+
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "exactly one of sdl or fields must be provided")
 		assert.NoError(t, mock.ExpectationsWereMet())
 	})
 

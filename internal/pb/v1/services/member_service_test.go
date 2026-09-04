@@ -208,6 +208,107 @@ func TestCreateMember_Success(t *testing.T) {
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
+func TestCreateMember_ExternallyProvisioned_Success_SkipsIdpCreation(t *testing.T) {
+	db, mock, cleanup := setupMemberMockDB(t)
+	defer cleanup()
+
+	mockIDP := &MockIDP{
+		// These must never be called for an externally provisioned member.
+		CreateUserFunc: func(ctx context.Context, user *idp.User) (*idp.UserInfo, error) {
+			t.Fatal("CreateUser should not be called for an externally provisioned member")
+			return nil, nil
+		},
+		AddMemberToGroupByGroupNameFunc: func(ctx context.Context, groupName string, member *idp.GroupMember) (*string, error) {
+			t.Fatal("AddMemberToGroupByGroupName should not be called for an externally provisioned member")
+			return nil, nil
+		},
+	}
+
+	service := NewMemberService(db, mockIDP)
+	ctx := context.Background()
+
+	idpUserID := "thunder-user-ndx-admin"
+	req := &models.CreateMemberRequest{
+		Name:        "Thunder Onboarded User",
+		Email:       "thunder-user@example.com",
+		PhoneNumber: "+1234567890",
+		IdpUserID:   &idpUserID,
+	}
+
+	now := time.Now()
+	mock.ExpectQuery(`INSERT INTO "members"`).
+		WillReturnRows(sqlmock.NewRows([]string{"member_id", "created_at", "updated_at"}).
+			AddRow("mem_test", now, now))
+
+	result, err := service.CreateMember(ctx, req)
+
+	assert.NoError(t, err)
+	assert.NotNil(t, result)
+	if result != nil {
+		assert.Equal(t, idpUserID, result.IdpUserID)
+	}
+	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestCreateMember_ExternallyProvisioned_EmptyIdpUserID(t *testing.T) {
+	db, _, cleanup := setupMemberMockDB(t)
+	defer cleanup()
+
+	service := NewMemberService(db, &MockIDP{})
+	ctx := context.Background()
+
+	empty := ""
+	req := &models.CreateMemberRequest{
+		Name:        "Thunder Onboarded User",
+		Email:       "thunder-user@example.com",
+		PhoneNumber: "+1234567890",
+		IdpUserID:   &empty,
+	}
+
+	result, err := service.CreateMember(ctx, req)
+
+	assert.Error(t, err)
+	assert.Nil(t, result)
+	assert.Contains(t, err.Error(), "must not be empty")
+}
+
+func TestCreateMember_ExternallyProvisioned_DatabaseError_NoIdpRollback(t *testing.T) {
+	db, mock, cleanup := setupMemberMockDB(t)
+	defer cleanup()
+
+	mockIDP := &MockIDP{
+		DeleteUserFunc: func(ctx context.Context, userID string) error {
+			t.Fatal("DeleteUser should not be called for an externally provisioned member")
+			return nil
+		},
+		RemoveMemberFromGroupFunc: func(ctx context.Context, groupID string, userID string) error {
+			t.Fatal("RemoveMemberFromGroup should not be called for an externally provisioned member")
+			return nil
+		},
+	}
+
+	service := NewMemberService(db, mockIDP)
+	ctx := context.Background()
+
+	idpUserID := "thunder-user-ndx-admin"
+	req := &models.CreateMemberRequest{
+		Name:        "Thunder Onboarded User",
+		Email:       "thunder-user@example.com",
+		PhoneNumber: "+1234567890",
+		IdpUserID:   &idpUserID,
+	}
+
+	mock.ExpectQuery(`INSERT INTO "members"`).
+		WillReturnError(errors.New("database constraint violation"))
+
+	result, err := service.CreateMember(ctx, req)
+
+	assert.Error(t, err)
+	assert.Nil(t, result)
+	assert.Contains(t, err.Error(), "failed to create member in database")
+	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
 func TestCreateMember_IDPCreateUserError(t *testing.T) {
 	// Arrange
 	db, _, cleanup := setupMemberMockDB(t)
