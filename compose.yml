@@ -231,15 +231,11 @@ services:
     build:
       context: .
       dockerfile: cmd/pb/Dockerfile
-      args:
-        BUILD_VERSION: ${BUILD_VERSION:-dev}
-        BUILD_TIME: ${BUILD_TIME:-2025-09-09T16:30:00Z}
-        GIT_COMMIT: ${GIT_COMMIT:-local}
     container_name: pb-${ENVIRONMENT:-local}
     ports:
-      - "${PORT_PB:-3000}:3000"
+      - "${PORT_PB:-8083}:8083"
     environment:
-      - PORT=3000
+      - PORT=8083
       - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS:-*}
       # Database configuration
       - DB_HOST=${DB_HOST:-postgres}

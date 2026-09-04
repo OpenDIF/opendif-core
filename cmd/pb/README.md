@@ -64,14 +64,14 @@ go run ./cmd/pb
 go build -o pb ./cmd/pb && ./pb
 ```
 
-The service runs on port 3000 by default.
+The service runs on port 8083 by default.
 
 ## Configuration
 
 ### Server Configuration
 
 ```bash
-PORT=3000                         # Server port (default: 3000)
+PORT=8083                         # Server port (default: 8083)
 CORS_ALLOWED_ORIGINS=*            # CORS allowed origins
 ```
 
@@ -195,7 +195,7 @@ Request → CORS → JWT Validation → Authorization → Resource Access
 docker build -t portal-backend -f cmd/pb/Dockerfile .
 
 # Run container
-docker run -p 3000:3000 \
+docker run -p 8083:8083 \
   -e DB_HOST=host.docker.internal \
   -e PDP_SERVICE_URL=http://host.docker.internal:8082 \
   --env-file cmd/pb/.env \

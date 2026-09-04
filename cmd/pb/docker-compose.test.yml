@@ -21,7 +21,7 @@ services:
       dockerfile: cmd/pb/Dockerfile
     environment:
       - ENVIRONMENT=test
-      - PORT=3000
+      - PORT=8083
       - DB_HOST=postgres-test
       - DB_PORT=5432
       - DB_USERNAME=test_user
@@ -29,7 +29,7 @@ services:
       - DB_NAME=portal_backend_test
       - DB_SSLMODE=disable
     ports:
-      - "3001:3000"
+      - "3001:8083"
     depends_on:
       postgres-test:
         condition: service_healthy
@@ -41,7 +41,7 @@ services:
           "--no-verbose",
           "--tries=1",
           "--spider",
-          "http://localhost:3000/health",
+          "http://localhost:8083/health",
         ]
       interval: 10s
       timeout: 5s
