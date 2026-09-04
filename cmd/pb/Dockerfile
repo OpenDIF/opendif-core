@@ -45,7 +45,7 @@ RUN chown -R appuser:appuser /app
 USER 10001
 
 # Expose port
-EXPOSE 3000
+EXPOSE 8083
 
 # Run the application
 CMD ["./pb"]

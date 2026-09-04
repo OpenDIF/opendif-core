@@ -35,7 +35,7 @@ servers:
     description: Choreo Production Environment
   - url: https://portal-backend-dev.choreo.dev
     description: Choreo Development Environment
-  - url: http://localhost:3000
+  - url: http://localhost:8083
     description: Local Development Environment
 
 paths:

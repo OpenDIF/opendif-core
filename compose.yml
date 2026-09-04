@@ -26,7 +26,7 @@ services:
       - postgres-data:/var/lib/postgresql/data
       - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-exchange} ${DB_NAME:-postgres}"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-exchange} -d ${DB_NAME:-postgres}"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -223,6 +223,62 @@ services:
       timeout: 10s
       retries: 3
       start_period: 10s
+    restart: unless-stopped
+    networks:
+      - openndx-network
+
+  portal-backend:
+    build:
+      context: .
+      dockerfile: cmd/pb/Dockerfile
+    container_name: pb-${ENVIRONMENT:-local}
+    ports:
+      - "${PORT_PB:-8083}:8083"
+    environment:
+      - PORT=8083
+      - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS:-*}
+      # Database configuration
+      - DB_HOST=${DB_HOST:-postgres}
+      - DB_PORT=${DB_PORT:-5432}
+      - DB_USERNAME=${DB_USER:-exchange}
+      - DB_PASSWORD=${DB_PASSWORD:-exchange}
+      - DB_NAME=${DB_NAME_PB:-portal_backend}
+      - DB_SSLMODE=${DB_SSLMODE:-disable}
+      - RUN_MIGRATION=${RUN_MIGRATION:-true}
+      - PDP_SERVICE_URL=http://policy-decision-point:8082
+      # IDP configuration for validating incoming JWTs (ndx CLI, portal frontends).
+      # IDP_ISSUER must match ThunderID's externally-visible public_url (the `iss`
+      # claim it stamps into tokens) — NOT the container-network address below,
+      # which is only used to actually reach the JWKS endpoint from inside the
+      # compose network.
+      - IDP_ISSUER=${IDP_PUBLIC_URL:-https://localhost:8090}
+      - IDP_JWKS_URL=https://thunderid:8090/oauth2/jwks
+      - IDP_JWKS_INSECURE_SKIP_VERIFY=${IDP_JWKS_INSECURE_SKIP_VERIFY:-true}
+      - IDP_ADMIN_PORTAL_CLIENT_ID=${NDX_CLI_CLIENT_ID:-NDX_CLI}
+      # PB's own outbound calls to the IDP (creating application/user records —
+      # POST /applications, POST /members) go through idpfactory, which only
+      # implements the Asgardeo (WSO2) admin API today — see
+      # docs/DESIGN-esignet-citizen-authentication.md §3.1 and
+      # internal/pb/idp/idpfactory/factory.go. These vars only need to be
+      # non-empty for PB to boot; against ThunderID those specific endpoints
+      # (create application/member) will still fail, since ThunderID's admin
+      # API isn't Asgardeo-shaped. Everything else (list/get applications,
+      # the policy-update endpoint the ndx CLI uses) doesn't call the IDP at
+      # all and works fine.
+      - IDP_BASE_URL=https://thunderid:8090
+      - IDP_CLIENT_ID=${NDX_CLI_CLIENT_ID:-NDX_CLI}
+      - IDP_CLIENT_SECRET=${IDP_CLIENT_SECRET:-unused-thunderid-has-no-secret}
+      # Authorization
+      - AUTHORIZATION_MODE=${AUTHORIZATION_MODE:-fail_open_admin_system}
+      - AUTHORIZATION_STRICT_MODE=${AUTHORIZATION_STRICT_MODE:-false}
+      # Audit (optional, degrades gracefully if unreachable)
+      - AUDIT_SERVICE_URL=${AUDIT_SERVICE_URL:-http://audit-service:3001}
+      - ARGUS_API_KEY=${ARGUS_API_KEY:-test-audit-token}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      thunderid:
+        condition: service_healthy
     restart: unless-stopped
     networks:
       - openndx-network

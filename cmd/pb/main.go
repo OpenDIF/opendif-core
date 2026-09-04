@@ -290,7 +290,7 @@ func main() {
 	// Start server
 	port := os.Getenv("PORT")
 	if port == "" {
-		port = "3000"
+		port = "8083"
 	}
 
 	addr := ":" + port
