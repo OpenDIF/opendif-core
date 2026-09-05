@@ -24,45 +24,63 @@ func NewMemberService(db *gorm.DB, idp idp.IdentityProviderAPI) *MemberService {
 	return &MemberService{db: db, idp: idp}
 }
 
-// CreateMember creates a new Member and automatically adds them to the "OpenNDX_Members" group in the IDP.
-// This ensures all newly created members are automatically assigned to the member group.
+// CreateMember creates a new Member. Normally this also provisions a user in
+// the IDP and adds them to the "OpenNDX_Members" group there, so all new
+// members are automatically assigned it. If req.IdpUserID is set, the caller
+// has already provisioned that user directly in the IDP (e.g. manually via
+// ThunderID's console, since idpfactory only supports Asgardeo's admin API
+// today) - IDP creation and group assignment are skipped, and the caller is
+// responsible for that group/role assignment having already happened.
 func (s *MemberService) CreateMember(ctx context.Context, req *models.CreateMemberRequest) (*models.MemberResponse, error) {
-	// Create user in the IDP
-	userInstance := &idp.User{
-		Email:       req.Email,
-		FirstName:   req.Name,
-		LastName:    "",
-		PhoneNumber: req.PhoneNumber,
+	externallyProvisioned := req.IdpUserID != nil
+	if externallyProvisioned && *req.IdpUserID == "" {
+		return nil, fmt.Errorf("idpUserId must not be empty")
 	}
-	createdUser, err := s.idp.CreateUser(ctx, userInstance)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create user in IDP: %w", err)
-	}
-	if createdUser.Email != userInstance.Email {
-		deleteErr := (s.idp).DeleteUser(ctx, createdUser.Id)
-		if deleteErr != nil {
-			return nil, fmt.Errorf("IDP user email mismatch, and failed to rollback user creation in IDP: %w", deleteErr)
-		}
-		return nil, fmt.Errorf("IDP user email mismatch: expected %s, got %s", userInstance.Email, createdUser.Email)
-	}
-	slog.Info("Created user in IDP", "userID", createdUser.Id, "email", createdUser.Email)
 
-	// Automatically add user to "OpenNDX_Members" group in the IDP
-	// This is a core requirement: all new members must be assigned to the member group
-	groupMember := &idp.GroupMember{
-		Value:   createdUser.Id,
-		Display: createdUser.Email,
-	}
-	groupId, err := s.idp.AddMemberToGroupByGroupName(ctx, string(models.UserGroupMember), groupMember)
-	if err != nil {
-		// Rollback: Delete the user we just created
-		deleteErr := s.idp.DeleteUser(ctx, createdUser.Id)
-		if deleteErr != nil {
-			return nil, fmt.Errorf("failed to add user to group %s: %w (rollback also failed: %v)", models.UserGroupMember, err, deleteErr)
+	var idpUserID string
+	var groupId *string
+
+	if externallyProvisioned {
+		idpUserID = *req.IdpUserID
+	} else {
+		// Create user in the IDP
+		userInstance := &idp.User{
+			Email:       req.Email,
+			FirstName:   req.Name,
+			LastName:    "",
+			PhoneNumber: req.PhoneNumber,
 		}
-		return nil, fmt.Errorf("failed to add user to group %s: %w", models.UserGroupMember, err)
+		createdUser, err := s.idp.CreateUser(ctx, userInstance)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create user in IDP: %w", err)
+		}
+		if createdUser.Email != userInstance.Email {
+			deleteErr := (s.idp).DeleteUser(ctx, createdUser.Id)
+			if deleteErr != nil {
+				return nil, fmt.Errorf("IDP user email mismatch, and failed to rollback user creation in IDP: %w", deleteErr)
+			}
+			return nil, fmt.Errorf("IDP user email mismatch: expected %s, got %s", userInstance.Email, createdUser.Email)
+		}
+		slog.Info("Created user in IDP", "userID", createdUser.Id, "email", createdUser.Email)
+
+		// Automatically add user to "OpenNDX_Members" group in the IDP
+		// This is a core requirement: all new members must be assigned to the member group
+		groupMember := &idp.GroupMember{
+			Value:   createdUser.Id,
+			Display: createdUser.Email,
+		}
+		groupId, err = s.idp.AddMemberToGroupByGroupName(ctx, string(models.UserGroupMember), groupMember)
+		if err != nil {
+			// Rollback: Delete the user we just created
+			deleteErr := s.idp.DeleteUser(ctx, createdUser.Id)
+			if deleteErr != nil {
+				return nil, fmt.Errorf("failed to add user to group %s: %w (rollback also failed: %v)", models.UserGroupMember, err, deleteErr)
+			}
+			return nil, fmt.Errorf("failed to add user to group %s: %w", models.UserGroupMember, err)
+		}
+		slog.Info("Added user to group", "userID", createdUser.Id, "groupId", *groupId, "groupName", models.UserGroupMember)
+		idpUserID = createdUser.Id
 	}
-	slog.Info("Added user to group", "userID", createdUser.Id, "groupId", *groupId, "groupName", models.UserGroupMember)
 
 	// Create Member in the database
 	member := models.Member{
@@ -70,15 +88,19 @@ func (s *MemberService) CreateMember(ctx context.Context, req *models.CreateMemb
 		Name:        req.Name,
 		Email:       req.Email,
 		PhoneNumber: req.PhoneNumber,
-		IdpUserID:   createdUser.Id,
+		IdpUserID:   idpUserID,
 	}
 	if dbErr := s.db.Create(&member).Error; dbErr != nil {
+		if externallyProvisioned {
+			// We didn't create anything in the IDP - nothing to roll back there.
+			return nil, fmt.Errorf("failed to create member in database: %w", dbErr)
+		}
 		// Rollback: Remove user from group and delete user from IDP
 		var rollbackErrs []error
-		if removeErr := s.idp.RemoveMemberFromGroup(ctx, *groupId, createdUser.Id); removeErr != nil {
+		if removeErr := s.idp.RemoveMemberFromGroup(ctx, *groupId, idpUserID); removeErr != nil {
 			rollbackErrs = append(rollbackErrs, fmt.Errorf("rollback group removal: %w", removeErr))
 		}
-		if deleteErr := s.idp.DeleteUser(ctx, createdUser.Id); deleteErr != nil {
+		if deleteErr := s.idp.DeleteUser(ctx, idpUserID); deleteErr != nil {
 			rollbackErrs = append(rollbackErrs, fmt.Errorf("rollback user deletion: %w", deleteErr))
 		}
 		if len(rollbackErrs) > 0 {

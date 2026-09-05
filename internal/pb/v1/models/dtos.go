@@ -23,13 +23,22 @@ type UpdateSchemaSubmissionRequest struct {
 	Review            *string `json:"review,omitempty"`
 }
 
-// CreateSchemaRequest creates a new provider schema
+// CreateSchemaRequest creates a new provider schema. Exactly one of SDL or
+// Fields must be provided.
 type CreateSchemaRequest struct {
 	SchemaName        string  `json:"schemaName" validate:"required"`
 	SchemaDescription *string `json:"schemaDescription,omitempty"`
-	SDL               string  `json:"sdl" validate:"required"`
-	Endpoint          string  `json:"endpoint" validate:"required"`
-	MemberID          string  `json:"memberId" validate:"required"`
+	// SDL is a GraphQL SDL string annotated with @accessControl/@source (and
+	// optionally @displayName/@description/@isOwner/@owner) directives, parsed
+	// into policy metadata records. Mutually exclusive with Fields.
+	SDL string `json:"sdl,omitempty"`
+	// Fields lets a caller declare policy metadata records directly, skipping
+	// SDL/GraphQL parsing entirely - each FieldName is used as-is (no forced
+	// typename.fieldName prefix the way SDL-derived field paths get).
+	// Mutually exclusive with SDL.
+	Fields   []PolicyMetadataCreateRequestRecord `json:"fields,omitempty"`
+	Endpoint string                              `json:"endpoint" validate:"required"`
+	MemberID string                              `json:"memberId" validate:"required"`
 }
 
 // UpdateSchemaRequest updates an existing provider schema
@@ -66,6 +75,14 @@ type CreateApplicationRequest struct {
 	ApplicationDescription *string               `json:"applicationDescription,omitempty"`
 	SelectedFields         []SelectedFieldRecord `json:"selectedFields" validate:"required,min=1"`
 	MemberID               string                `json:"memberId" validate:"required"`
+	// IdpApplicationID and IdpClientID let a caller register an application whose
+	// OAuth2 client was already provisioned directly in the IDP (e.g. manually via
+	// ThunderID's console, since idpfactory only implements Asgardeo's admin API
+	// today - see internal/pb/idp/idpfactory). When both are set, creation skips
+	// calling the IDP entirely and uses these values as-is. Must be provided
+	// together (both or neither) - a single field alone is rejected.
+	IdpApplicationID *string `json:"idpApplicationId,omitempty"`
+	IdpClientID      *string `json:"idpClientId,omitempty"`
 }
 
 // UpdateApplicationRequest updates an existing consumer application
@@ -88,6 +105,14 @@ type CreateMemberRequest struct {
 	Name        string `json:"name" validate:"required"`
 	Email       string `json:"email" validate:"required,email"`
 	PhoneNumber string `json:"phoneNumber" validate:"required"`
+	// IdpUserID lets a caller register a member whose IDP account was already
+	// provisioned directly (e.g. manually via ThunderID's console, since
+	// idpfactory only implements Asgardeo's admin API today - see
+	// internal/pb/idp/idpfactory). When set, creation skips creating the user
+	// and assigning them to the member group in the IDP entirely, and uses
+	// this value as-is - the caller is responsible for that group/role
+	// assignment having already happened.
+	IdpUserID *string `json:"idpUserId,omitempty"`
 }
 
 type UpdateMemberRequest struct {

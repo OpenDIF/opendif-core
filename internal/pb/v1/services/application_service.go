@@ -25,26 +25,48 @@ func NewApplicationService(db *gorm.DB, pdpService *PDPService, idp idp.Identity
 	return &ApplicationService{db: db, policyService: pdpService, idp: idp}
 }
 
-// CreateApplication creates a new application
+// CreateApplication creates a new application. If req.IdpApplicationID and
+// req.IdpClientID are both set, the caller has already provisioned the OAuth2
+// client directly in the IDP (e.g. manually via ThunderID's console, since
+// idpfactory only supports Asgardeo's admin API today) - IDP creation is
+// skipped and those values are used as-is.
 func (s *ApplicationService) CreateApplication(ctx context.Context, req *models.CreateApplicationRequest) (*models.ApplicationResponse, error) {
-	// Step 1: Create Application in the IDP
-	description := ""
-	if req.ApplicationDescription != nil {
-		description = *req.ApplicationDescription
+	externallyProvisioned := req.IdpApplicationID != nil || req.IdpClientID != nil
+	if externallyProvisioned && (req.IdpApplicationID == nil || req.IdpClientID == nil) {
+		return nil, fmt.Errorf("idpApplicationId and idpClientId must both be provided together, or both omitted")
+	}
+	if externallyProvisioned && (*req.IdpApplicationID == "" || *req.IdpClientID == "") {
+		return nil, fmt.Errorf("idpApplicationId and idpClientId must not be empty")
 	}
 
-	applicationInstance := &idp.Application{
-		Name:        req.ApplicationName,
-		Description: description,
-		TemplateId:  models.TemplateIDM2M,
-	}
-	idpApplicationID, err := s.idp.CreateApplication(ctx, applicationInstance)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create application: %w", err)
-	}
-	appOIDCInfo, err := s.idp.GetApplicationOIDC(ctx, *idpApplicationID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get application OIDC: %w", err)
+	var idpApplicationID *string
+	var idpClientID *string
+
+	if externallyProvisioned {
+		idpApplicationID = req.IdpApplicationID
+		idpClientID = req.IdpClientID
+	} else {
+		// Step 1: Create Application in the IDP
+		description := ""
+		if req.ApplicationDescription != nil {
+			description = *req.ApplicationDescription
+		}
+
+		applicationInstance := &idp.Application{
+			Name:        req.ApplicationName,
+			Description: description,
+			TemplateId:  models.TemplateIDM2M,
+		}
+		var err error
+		idpApplicationID, err = s.idp.CreateApplication(ctx, applicationInstance)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create application: %w", err)
+		}
+		appOIDCInfo, err := s.idp.GetApplicationOIDC(ctx, *idpApplicationID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get application OIDC: %w", err)
+		}
+		idpClientID = &appOIDCInfo.ClientId
 	}
 
 	// Step 2: Create application in database
@@ -54,23 +76,27 @@ func (s *ApplicationService) CreateApplication(ctx context.Context, req *models.
 		ApplicationDescription: req.ApplicationDescription,
 		SelectedFields:         models.SelectedFieldRecords(req.SelectedFields),
 		IdpApplicationID:       idpApplicationID,
-		IdpClientID:            &appOIDCInfo.ClientId,
+		IdpClientID:            idpClientID,
 		MemberID:               req.MemberID,
 		Version:                string(models.ActiveVersion),
 	}
 
 	if err := s.db.WithContext(ctx).Create(&application).Error; err != nil {
-		// Compensation: Delete the application we just created
-		if deleteErr := s.idp.DeleteApplication(ctx, *idpApplicationID); deleteErr != nil {
-			// Log the compensation failure - this needs monitoring
-			slog.Error("Failed to compensate application creation",
-				"applicationID", application.ApplicationID,
-				"originalError", err,
-				"compensationError", deleteErr)
-			// Return both errors for visibility
-			return nil, fmt.Errorf("failed to create application: %w, and failed to compensate: %w", err, deleteErr)
+		// Compensation: delete the application from the IDP, but only if we're
+		// the ones who created it there - an externally provisioned client
+		// isn't ours to delete.
+		if !externallyProvisioned {
+			if deleteErr := s.idp.DeleteApplication(ctx, *idpApplicationID); deleteErr != nil {
+				// Log the compensation failure - this needs monitoring
+				slog.Error("Failed to compensate application creation",
+					"applicationID", application.ApplicationID,
+					"originalError", err,
+					"compensationError", deleteErr)
+				// Return both errors for visibility
+				return nil, fmt.Errorf("failed to create application: %w, and failed to compensate: %w", err, deleteErr)
+			}
+			slog.Info("Successfully compensated application creation", "applicationID", application.ApplicationID)
 		}
-		slog.Info("Successfully compensated application creation", "applicationID", application.ApplicationID)
 		return nil, fmt.Errorf("failed to create application: %w", err)
 	}
 
@@ -88,7 +114,7 @@ func (s *ApplicationService) CreateApplication(ctx context.Context, req *models.
 		GrantDuration: models.GrantDurationTypeOneMonth, // Default duration
 	}
 
-	_, err = s.policyService.UpdateAllowList(policyReq)
+	_, err := s.policyService.UpdateAllowList(policyReq)
 	if err != nil {
 		// Compensation: Attempt both cleanup operations regardless of individual failures
 		// This ensures we don't leave orphaned resources in either system
@@ -103,14 +129,18 @@ func (s *ApplicationService) CreateApplication(ctx context.Context, req *models.
 				"compensationError", dbDeleteErr)
 		}
 
-		// Attempt to delete from IDP regardless of database deletion result
-		idpDeleteErr = s.idp.DeleteApplication(ctx, *application.IdpApplicationID)
-		if idpDeleteErr != nil {
-			slog.Error("Failed to delete application from IDP during compensation",
-				"applicationID", application.ApplicationID,
-				"idpApplicationID", *application.IdpApplicationID,
-				"originalError", err,
-				"compensationError", idpDeleteErr)
+		// Attempt to delete from IDP regardless of database deletion result -
+		// but only if we created it there; an externally provisioned client
+		// isn't ours to delete.
+		if !externallyProvisioned {
+			idpDeleteErr = s.idp.DeleteApplication(ctx, *application.IdpApplicationID)
+			if idpDeleteErr != nil {
+				slog.Error("Failed to delete application from IDP during compensation",
+					"applicationID", application.ApplicationID,
+					"idpApplicationID", *application.IdpApplicationID,
+					"originalError", err,
+					"compensationError", idpDeleteErr)
+			}
 		}
 
 		// Determine the appropriate error response based on what failed

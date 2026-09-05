@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/openndx/openndx-core/internal/pb/idp"
 	"github.com/openndx/openndx-core/internal/pb/v1/models"
 	"github.com/stretchr/testify/assert"
 	"gorm.io/gorm"
@@ -123,6 +124,176 @@ func TestApplicationService_CreateApplication(t *testing.T) {
 		resp, err := service.CreateApplication(context.Background(), req)
 
 		// Assert
+		assert.Error(t, err)
+		assert.Nil(t, resp)
+		assert.Contains(t, err.Error(), "failed to update allow list")
+
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+}
+
+func TestApplicationService_CreateApplication_ExternallyProvisioned(t *testing.T) {
+	t.Run("Success_SkipsIdpCreation", func(t *testing.T) {
+		db, mock, cleanup := SetupMockDB(t)
+		defer cleanup()
+
+		var capturedAllowList models.AllowListUpdateRequest
+		mockTransport := &MockRoundTripper{
+			RoundTripFunc: func(req *http.Request) (*http.Response, error) {
+				if req.Body != nil {
+					body, _ := io.ReadAll(req.Body)
+					_ = json.Unmarshal(body, &capturedAllowList)
+				}
+				return &http.Response{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(bytes.NewBufferString(`{"records": [{"id": "policy_1"}]}`)),
+					Header:     make(http.Header),
+				}, nil
+			},
+		}
+		pdpService := NewPDPService("http://mock-pdp")
+		pdpService.HTTPClient = &http.Client{Transport: mockTransport}
+
+		mockIDP := &MockIDP{
+			// These must never be called for an externally provisioned application.
+			CreateApplicationFunc: func(ctx context.Context, app *idp.Application) (*string, error) {
+				t.Fatal("CreateApplication should not be called for an externally provisioned application")
+				return nil, nil
+			},
+			GetApplicationOIDCFunc: func(ctx context.Context, applicationID string) (*idp.ApplicationOIDCInfo, error) {
+				t.Fatal("GetApplicationOIDC should not be called for an externally provisioned application")
+				return nil, nil
+			},
+		}
+		service := NewApplicationService(db, pdpService, mockIDP)
+
+		idpAppID := "thunder-app-01900000-0000-7000-8000-0000000000c0"
+		idpClientID := "THUNDER_PROVISIONED_CLIENT"
+		req := &models.CreateApplicationRequest{
+			ApplicationName: "Manually Onboarded App",
+			SelectedFields: []models.SelectedFieldRecord{
+				{FieldName: "field1", SchemaID: "schema-123"},
+			},
+			MemberID:         "member-123",
+			IdpApplicationID: &idpAppID,
+			IdpClientID:      &idpClientID,
+		}
+
+		mock.ExpectQuery(`INSERT INTO "applications"`).
+			WillReturnRows(sqlmock.NewRows([]string{"application_id"}).AddRow("app_123"))
+
+		resp, err := service.CreateApplication(context.Background(), req)
+
+		assert.NoError(t, err)
+		assert.NotNil(t, resp)
+		if resp != nil {
+			assert.Equal(t, idpAppID, *resp.IdpApplicationID)
+			assert.Equal(t, idpClientID, *resp.IdpClientID)
+		}
+
+		// The allow-list must be keyed by the caller-supplied client ID.
+		assert.Equal(t, idpClientID, capturedAllowList.ApplicationID)
+
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+
+	t.Run("Error_OnlyOneIDProvided", func(t *testing.T) {
+		db, _, cleanup := SetupMockDB(t)
+		defer cleanup()
+
+		pdpService := NewPDPService("http://mock-pdp")
+		mockIDP := &MockIDP{}
+		service := NewApplicationService(db, pdpService, mockIDP)
+
+		idpAppID := "thunder-app-01900000-0000-7000-8000-0000000000c0"
+		req := &models.CreateApplicationRequest{
+			ApplicationName: "Bad Request App",
+			SelectedFields: []models.SelectedFieldRecord{
+				{FieldName: "field1", SchemaID: "schema-123"},
+			},
+			MemberID:         "member-123",
+			IdpApplicationID: &idpAppID,
+			// IdpClientID intentionally omitted
+		}
+
+		resp, err := service.CreateApplication(context.Background(), req)
+
+		assert.Error(t, err)
+		assert.Nil(t, resp)
+		assert.Contains(t, err.Error(), "must both be provided together")
+	})
+
+	t.Run("Error_EmptyValues", func(t *testing.T) {
+		db, _, cleanup := SetupMockDB(t)
+		defer cleanup()
+
+		pdpService := NewPDPService("http://mock-pdp")
+		mockIDP := &MockIDP{}
+		service := NewApplicationService(db, pdpService, mockIDP)
+
+		empty := ""
+		idpClientID := "some-client-id"
+		req := &models.CreateApplicationRequest{
+			ApplicationName: "Bad Request App",
+			SelectedFields: []models.SelectedFieldRecord{
+				{FieldName: "field1", SchemaID: "schema-123"},
+			},
+			MemberID:         "member-123",
+			IdpApplicationID: &empty,
+			IdpClientID:      &idpClientID,
+		}
+
+		resp, err := service.CreateApplication(context.Background(), req)
+
+		assert.Error(t, err)
+		assert.Nil(t, resp)
+		assert.Contains(t, err.Error(), "must not be empty")
+	})
+
+	t.Run("PDPFailure_DoesNotAttemptIdpDeletion", func(t *testing.T) {
+		db, mock, cleanup := SetupMockDB(t)
+		defer cleanup()
+
+		mockTransport := &MockRoundTripper{
+			RoundTripFunc: func(req *http.Request) (*http.Response, error) {
+				return &http.Response{
+					StatusCode: http.StatusInternalServerError,
+					Body:       io.NopCloser(bytes.NewBufferString(`{"error": "pdp error"}`)),
+					Header:     make(http.Header),
+				}, nil
+			},
+		}
+		pdpService := NewPDPService("http://mock-pdp")
+		pdpService.HTTPClient = &http.Client{Transport: mockTransport}
+
+		mockIDP := &MockIDP{
+			DeleteApplicationFunc: func(ctx context.Context, applicationID string) error {
+				t.Fatal("DeleteApplication should not be called for an externally provisioned application")
+				return nil
+			},
+		}
+		service := NewApplicationService(db, pdpService, mockIDP)
+
+		idpAppID := "thunder-app-01900000-0000-7000-8000-0000000000c0"
+		idpClientID := "THUNDER_PROVISIONED_CLIENT"
+		req := &models.CreateApplicationRequest{
+			ApplicationName: "Manually Onboarded App",
+			SelectedFields: []models.SelectedFieldRecord{
+				{FieldName: "field1", SchemaID: "schema-123"},
+			},
+			MemberID:         "member-123",
+			IdpApplicationID: &idpAppID,
+			IdpClientID:      &idpClientID,
+		}
+
+		mock.ExpectQuery(`INSERT INTO "applications"`).
+			WillReturnRows(sqlmock.NewRows([]string{"application_id"}).AddRow("app_123"))
+		// Compensation: DB delete only - no IDP call expected.
+		mock.ExpectExec(`DELETE FROM "applications"`).
+			WillReturnResult(sqlmock.NewResult(0, 1))
+
+		resp, err := service.CreateApplication(context.Background(), req)
+
 		assert.Error(t, err)
 		assert.Nil(t, resp)
 		assert.Contains(t, err.Error(), "failed to update allow list")

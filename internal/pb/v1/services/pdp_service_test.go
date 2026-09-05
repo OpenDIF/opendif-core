@@ -59,7 +59,7 @@ func TestPDPService_CreatePolicyMetadata_Success(t *testing.T) {
 			Records: expectedRecords,
 		}
 		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
+		w.WriteHeader(http.StatusCreated) // PDP's CreatePolicyMetadata handler returns 201
 		json.NewEncoder(w).Encode(response)
 	}))
 	defer server.Close()
@@ -81,6 +81,70 @@ func TestPDPService_CreatePolicyMetadata_Success(t *testing.T) {
 	assert.Len(t, response.Records, 1)
 	assert.Equal(t, expectedRecords[0].ID, response.Records[0].ID)
 	assert.Equal(t, expectedRecords[0].SchemaID, response.Records[0].SchemaID)
+}
+
+func TestPDPService_CreatePolicyMetadataFromRecords_Success(t *testing.T) {
+	schemaID := "test-schema-123"
+	records := []models.PolicyMetadataCreateRequestRecord{
+		{
+			FieldName:         "email",
+			Source:            models.SourcePrimary,
+			AccessControlType: models.AccessControlTypePublic,
+		},
+	}
+
+	var capturedReq models.PolicyMetadataCreateRequest
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "POST", r.Method)
+		assert.Equal(t, "/api/v1/policy/metadata", r.URL.Path)
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&capturedReq))
+
+		response := models.PolicyMetadataCreateResponse{
+			Records: []models.PolicyMetadataResponse{
+				{ID: "record-1", SchemaID: schemaID, FieldName: "email"},
+			},
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated) // PDP's CreatePolicyMetadata handler returns 201
+		_ = json.NewEncoder(w).Encode(response)
+	}))
+	defer server.Close()
+
+	service := NewPDPService(server.URL)
+
+	response, err := service.CreatePolicyMetadataFromRecords(schemaID, records)
+
+	require.NoError(t, err)
+	assert.NotNil(t, response)
+	if response != nil {
+		assert.Len(t, response.Records, 1)
+	}
+
+	// No SDL parsing should have happened - the exact records given must be
+	// forwarded to the PDP as-is, with no typename-prefix mangling.
+	assert.Equal(t, schemaID, capturedReq.SchemaID)
+	if assert.Len(t, capturedReq.Records, 1) {
+		assert.Equal(t, "email", capturedReq.Records[0].FieldName)
+		assert.Equal(t, models.SourcePrimary, capturedReq.Records[0].Source)
+		assert.Equal(t, models.AccessControlTypePublic, capturedReq.Records[0].AccessControlType)
+	}
+}
+
+func TestPDPService_CreatePolicyMetadataFromRecords_Non200Status(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write([]byte(`{"error": "bad records"}`))
+	}))
+	defer server.Close()
+
+	service := NewPDPService(server.URL)
+	response, err := service.CreatePolicyMetadataFromRecords("schema-1", []models.PolicyMetadataCreateRequestRecord{
+		{FieldName: "email", Source: models.SourcePrimary, AccessControlType: models.AccessControlTypePublic},
+	})
+
+	assert.Error(t, err)
+	assert.Nil(t, response)
+	assert.Contains(t, err.Error(), "status 400")
 }
 
 func TestPDPService_CreatePolicyMetadata_InvalidSDL(t *testing.T) {
@@ -121,7 +185,7 @@ func TestPDPService_CreatePolicyMetadata_InvalidJSONResponse(t *testing.T) {
 	// Create a mock HTTP server that returns invalid JSON
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
+		w.WriteHeader(http.StatusCreated) // PDP's CreatePolicyMetadata handler returns 201
 		w.Write([]byte(`invalid json`))
 	}))
 	defer server.Close()
