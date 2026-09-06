@@ -279,9 +279,10 @@ func TestListApplications_Success(t *testing.T) {
 
 	assert.NoError(t, err)
 	assert.Equal(t, "/api/v1/applications", capturedPath)
-	if assert.Len(t, apps, 2) {
-		assert.Equal(t, "app_1", apps[0].ApplicationID)
-		assert.Equal(t, "app_2", apps[1].ApplicationID)
+	assert.Equal(t, 2, apps.Count)
+	if assert.Len(t, apps.Items, 2) {
+		assert.Equal(t, "app_1", apps.Items[0].ApplicationID)
+		assert.Equal(t, "app_2", apps.Items[1].ApplicationID)
 	}
 }
 
@@ -313,7 +314,8 @@ func TestListApplications_EmptyResult(t *testing.T) {
 	apps, err := client.ListApplications(context.Background(), nil)
 
 	assert.NoError(t, err)
-	assert.Empty(t, apps)
+	assert.Empty(t, apps.Items)
+	assert.Equal(t, 0, apps.Count)
 }
 
 func TestUpdateApplicationPolicy_Success(t *testing.T) {

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -42,6 +43,12 @@ func DefaultCredentialsPath(profileName string) (string, error) {
 	}
 	if profileName == "" || profileName == "local" {
 		return filepath.Join(home, ".openndx", "credentials.json"), nil
+	}
+	// profileName can come from a config file, --profile flag, or NDX_PROFILE
+	// env var - reject path separators so it can't be used to write the
+	// cached token outside the .openndx directory (e.g. "../../.ssh/foo").
+	if strings.ContainsAny(profileName, "/\\") {
+		return "", fmt.Errorf("invalid profile name %q: must not contain path separators", profileName)
 	}
 	return filepath.Join(home, ".openndx", fmt.Sprintf("credentials-%s.json", profileName)), nil
 }

@@ -140,6 +140,44 @@ func TestLogin_ExtraParamsAppliedToTokenRequestAndPersisted(t *testing.T) {
 	}
 }
 
+func TestLogin_RepeatedCallbacksDoNotBlock(t *testing.T) {
+	tokenServer := newTestTokenServer(t, nil, `{"access_token":"at-123","refresh_token":"rt-456","token_type":"Bearer","expires_in":3600}`, http.StatusOK)
+	defer tokenServer.Close()
+
+	withStubbedBrowser(t, func(rawURL string) error {
+		// A flaky browser/IDP redelivering the redirect must not deadlock
+		// the handler on the already-drained, capacity-1 resultCh - each of
+		// these is a synchronous call, so a blocked handler here would hang
+		// this stub (and therefore Login, which is still inside its
+		// openBrowser call) forever rather than surfacing as a timeout.
+		for i := 0; i < 3; i++ {
+			if err := simulateBrowserCallback(t, rawURL, nil, nil); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+
+	done := make(chan error, 1)
+	go func() {
+		_, err := Login(context.Background(), LoginOptions{
+			AuthURL:     "https://idp.example.com/oauth2/authorize",
+			TokenURL:    tokenServer.URL,
+			ClientID:    "cli-client",
+			OpenBrowser: true,
+			Timeout:     5 * time.Second,
+		})
+		done <- err
+	}()
+
+	select {
+	case err := <-done:
+		assert.NoError(t, err)
+	case <-time.After(2 * time.Second):
+		t.Fatal("Login did not return - a repeated callback likely deadlocked the handler")
+	}
+}
+
 func TestLogin_StateMismatch(t *testing.T) {
 	tokenServer := newTestTokenServer(t, nil, `{}`, http.StatusOK)
 	defer tokenServer.Close()

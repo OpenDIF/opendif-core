@@ -865,12 +865,12 @@ func runApplicationsList(ctx context.Context, args []string) error {
 		return enc.Encode(apps)
 	}
 
-	if len(apps) == 0 {
+	if len(apps.Items) == 0 {
 		fmt.Println("No applications found.")
 		return nil
 	}
 	fmt.Printf("%-40s %-30s %-40s %s\n", "APPLICATION ID", "NAME", "MEMBER ID", "FIELDS")
-	for _, app := range apps {
+	for _, app := range apps.Items {
 		fmt.Printf("%-40s %-30s %-40s %d\n", app.ApplicationID, app.ApplicationName, app.MemberID, len(app.SelectedFields))
 	}
 	return nil

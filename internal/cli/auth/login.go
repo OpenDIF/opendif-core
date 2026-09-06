@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"runtime"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -83,24 +84,32 @@ func Login(ctx context.Context, opts LoginOptions) (*Token, error) {
 	port := listener.Addr().(*net.TCPAddr).Port
 	redirectURI := fmt.Sprintf("http://127.0.0.1:%d/callback", port)
 
+	// resultCh has room for exactly one result, since Login only ever reads
+	// one; callbackOnce keeps a second (e.g. duplicate or retried) callback
+	// hit from blocking on that full channel forever - srv.Shutdown doesn't
+	// interrupt an in-flight handler, so a blocked send would otherwise wait
+	// out its whole shutdown deadline.
 	resultCh := make(chan callbackResult, 1)
+	var callbackOnce sync.Once
 	mux := http.NewServeMux()
 	mux.HandleFunc("/callback", func(w http.ResponseWriter, r *http.Request) {
 		q := r.URL.Query()
+		var result callbackResult
 		switch {
 		case q.Get("error") != "":
-			resultCh <- callbackResult{err: fmt.Errorf("authorization failed: %s: %s", q.Get("error"), q.Get("error_description"))}
+			result = callbackResult{err: fmt.Errorf("authorization failed: %s: %s", q.Get("error"), q.Get("error_description"))}
 			writeCallbackResponse(w, false)
 		case q.Get("state") != state:
-			resultCh <- callbackResult{err: fmt.Errorf("state mismatch in callback: possible CSRF, aborting login")}
+			result = callbackResult{err: fmt.Errorf("state mismatch in callback: possible CSRF, aborting login")}
 			writeCallbackResponse(w, false)
 		case q.Get("code") == "":
-			resultCh <- callbackResult{err: fmt.Errorf("no authorization code returned by identity provider")}
+			result = callbackResult{err: fmt.Errorf("no authorization code returned by identity provider")}
 			writeCallbackResponse(w, false)
 		default:
-			resultCh <- callbackResult{code: q.Get("code")}
+			result = callbackResult{code: q.Get("code")}
 			writeCallbackResponse(w, true)
 		}
+		callbackOnce.Do(func() { resultCh <- result })
 	})
 
 	srv := &http.Server{Handler: mux}

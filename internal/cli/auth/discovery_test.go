@@ -51,6 +51,22 @@ func TestDiscoverEndpoints_NotFound(t *testing.T) {
 	assert.ErrorContains(t, err, "status 404")
 }
 
+func TestDiscoverEndpoints_ResponseTooLarge(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		oversized := make([]byte, maxDiscoveryResponseBytes+1)
+		for i := range oversized {
+			oversized[i] = ' '
+		}
+		_, _ = w.Write(oversized)
+	}))
+	defer server.Close()
+
+	_, _, err := DiscoverEndpoints(context.Background(), server.Client(), server.URL)
+	assert.Error(t, err)
+	assert.ErrorContains(t, err, "larger than")
+}
+
 func TestDiscoverEndpoints_MissingEndpoints(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")

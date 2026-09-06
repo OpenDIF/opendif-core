@@ -10,8 +10,8 @@
 # thunderid/bootstrap/resource.yaml (id ...092), not from this client config.
 resource_type: application
 id: 01900000-0000-7000-8000-000000000091
-name: Passport Application
-description: Passport Application for Local Development OE data API
+name: Sample Data Consumer
+description: Local-dev M2M client for calling the OE data API
 type: m2m
 ouId: 01900000-0000-7000-8000-000000000001
 allowedUserTypes: []

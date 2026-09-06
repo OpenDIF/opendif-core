@@ -14,10 +14,10 @@ import (
 	"path/filepath"
 )
 
-// DefaultName is the profile ndx falls back to when no config file exists
+// DefaultName is the profile ondx falls back to when no config file exists
 // yet and none is named explicitly, pre-populated with this repo's
 // docker-compose local-dev stack (ThunderID as IDP, Portal Backend on
-// :3000) so `ndx login` works with zero flags out of the box.
+// :3000) so `ondx login` works with zero flags out of the box.
 const DefaultName = "local"
 
 var defaultLocalProfile = Profile{
@@ -60,7 +60,7 @@ func DefaultConfigPath() (string, error) {
 
 // Load reads the config file at path. A missing file is not an error - it
 // yields a config with just the built-in default profile, so a first-time
-// user gets working defaults without ever running `ndx profile set`. The
+// user gets working defaults without ever running `ondx profile set`. The
 // default profile is likewise injected whenever the file exists but doesn't
 // define one of its own under DefaultName.
 func Load(path string) (*Config, error) {
@@ -110,7 +110,7 @@ func Save(path string, cfg *Config) error {
 func (c *Config) Get(name string) (Profile, error) {
 	p, ok := c.Profiles[name]
 	if !ok {
-		return Profile{}, fmt.Errorf("no such profile %q (run 'ndx profile list' to see available profiles)", name)
+		return Profile{}, fmt.Errorf("no such profile %q (run 'ondx profile list' to see available profiles)", name)
 	}
 	return p, nil
 }

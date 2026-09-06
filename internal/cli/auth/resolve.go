@@ -11,7 +11,7 @@ import (
 func EnsureFreshToken(ctx context.Context, path string, httpClient *http.Client) (*Token, error) {
 	token, err := LoadToken(path)
 	if err != nil {
-		return nil, fmt.Errorf("not logged in (run 'ndx login' first): %w", err)
+		return nil, fmt.Errorf("not logged in (run 'ondx login' first): %w", err)
 	}
 
 	if !token.Expired() {
@@ -20,7 +20,7 @@ func EnsureFreshToken(ctx context.Context, path string, httpClient *http.Client)
 
 	refreshed, err := RefreshToken(ctx, httpClient, token)
 	if err != nil {
-		return nil, fmt.Errorf("session expired and could not be refreshed (run 'ndx login' again): %w", err)
+		return nil, fmt.Errorf("session expired and could not be refreshed (run 'ondx login' again): %w", err)
 	}
 
 	if err := SaveToken(path, refreshed); err != nil {

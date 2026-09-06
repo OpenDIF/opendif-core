@@ -71,4 +71,14 @@ func TestDefaultCredentialsPath(t *testing.T) {
 		assert.Contains(t, path, ".openndx")
 		assert.True(t, strings.HasSuffix(path, "credentials-staging.json"))
 	})
+
+	t.Run("rejects profile names containing a path separator", func(t *testing.T) {
+		_, err := DefaultCredentialsPath("../../.ssh/id_rsa")
+		assert.Error(t, err)
+		assert.ErrorContains(t, err, "must not contain path separators")
+
+		_, err = DefaultCredentialsPath(`staging\..\..\secrets`)
+		assert.Error(t, err)
+		assert.ErrorContains(t, err, "must not contain path separators")
+	})
 }

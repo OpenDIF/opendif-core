@@ -110,7 +110,7 @@ func (c *Client) CreateMember(ctx context.Context, req *models.CreateMemberReque
 
 // GetApplication calls GET /api/v1/applications/{applicationId}.
 func (c *Client) GetApplication(ctx context.Context, applicationID string) (*models.ApplicationResponse, error) {
-	body, err := c.doJSON(ctx, http.MethodGet, fmt.Sprintf("/api/v1/applications/%s", applicationID), nil)
+	body, err := c.doJSON(ctx, http.MethodGet, "/api/v1/applications/"+url.PathEscape(applicationID), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -121,9 +121,15 @@ func (c *Client) GetApplication(ctx context.Context, applicationID string) (*mod
 	return &app, nil
 }
 
+// ApplicationCollection is the GET /api/v1/applications response envelope.
+type ApplicationCollection struct {
+	Items []models.ApplicationResponse `json:"items"`
+	Count int                          `json:"count"`
+}
+
 // ListApplications calls GET /api/v1/applications, optionally filtered to one
 // member's applications.
-func (c *Client) ListApplications(ctx context.Context, memberID *string) ([]models.ApplicationResponse, error) {
+func (c *Client) ListApplications(ctx context.Context, memberID *string) (*ApplicationCollection, error) {
 	path := "/api/v1/applications"
 	if memberID != nil && *memberID != "" {
 		path += "?memberId=" + url.QueryEscape(*memberID)
@@ -133,19 +139,17 @@ func (c *Client) ListApplications(ctx context.Context, memberID *string) ([]mode
 	if err != nil {
 		return nil, err
 	}
-	var collection struct {
-		Items []models.ApplicationResponse `json:"items"`
-	}
+	var collection ApplicationCollection
 	if err := json.Unmarshal(body, &collection); err != nil {
 		return nil, fmt.Errorf("failed to parse response: %w", err)
 	}
-	return collection.Items, nil
+	return &collection, nil
 }
 
 // UpdateApplicationPolicy calls PUT /api/v1/applications/{applicationId}/policy
 // to replace an existing application's allow-list.
 func (c *Client) UpdateApplicationPolicy(ctx context.Context, applicationID string, req *models.UpdateApplicationPolicyRequest) (*models.ApplicationResponse, error) {
-	body, err := c.doJSON(ctx, http.MethodPut, fmt.Sprintf("/api/v1/applications/%s/policy", applicationID), req)
+	body, err := c.doJSON(ctx, http.MethodPut, "/api/v1/applications/"+url.PathEscape(applicationID)+"/policy", req)
 	if err != nil {
 		return nil, err
 	}
