@@ -10,8 +10,8 @@
 # thunderid/bootstrap/resource.yaml (id ...092), not from this client config.
 resource_type: application
 id: 01900000-0000-7000-8000-000000000091
-name: Sample Data Consumer
-description: Local-dev M2M client for calling the OE data API
+name: Passport Application
+description: Passport Application for Local Development OE data API
 type: m2m
 ouId: 01900000-0000-7000-8000-000000000001
 allowedUserTypes: []
@@ -106,3 +106,63 @@ inboundAuthConfig:
         phone:
           - phone_number
           - phone_number_verified
+---
+# LOCAL-DEV ONLY: the `ndx` management CLI's OAuth2 client, so it can log admin
+# operators in against a local ThunderID instance and call Portal Backend's
+# management API. Do not mount into a shared or production deployment.
+#
+# type/pkceRequired/tokenEndpointAuthMethod/publicClient mirror CONSENT_PORTAL
+# above — the only other confirmed-working public-client config in this repo.
+# "native" isn't used here since it's not a documented type in this repo; if
+# ThunderID does support it, prefer it over reusing "browser".
+#
+# redirectUris is a single literal loopback URI, not a wildcard/regex, because
+# nothing in this repo's bootstrap config demonstrates ThunderID accepting a
+# pattern here (contrast thunderid/bootstrap/cors.yaml's allowedOrigins, which
+# does support a `regex:` entry — untested whether redirectUris shares that).
+# `ndx login` must be run with --callback-port 8765 to match. If ThunderID
+# does support a wildcard/regex loopback redirect URI (per RFC 8252 §7.3),
+# this can be relaxed and --callback-port dropped in favor of a random port.
+resource_type: application
+id: 01900000-0000-7000-8000-0000000000b0
+name: NDX CLI
+description: ndx management CLI — admin operator login for Portal Backend
+type: browser
+ouId: 01900000-0000-7000-8000-000000000001
+authFlowId: 01900000-0000-7000-8000-000000000061
+registrationFlowId: 01900000-0000-7000-8000-000000000064
+isRegistrationFlowEnabled: false
+signOutFlowId: 01900000-0000-7000-8000-00000000006a
+recoveryFlowId: 01900000-0000-7000-8000-000000000067
+isRecoveryFlowEnabled: false
+allowedUserTypes:
+  - Person
+inboundAuthConfig:
+  - type: oauth2
+    config:
+      clientId: NDX_CLI
+      redirectUris:
+        - "http://127.0.0.1:8765/callback"
+      grantTypes:
+        - authorization_code
+        - refresh_token
+      responseTypes:
+        - code
+      pkceRequired: true
+      tokenEndpointAuthMethod: none
+      publicClient: true
+      token:
+        accessToken:
+          userConfig:
+            validityPeriod: 3600
+            attributes:
+              - given_name
+              - family_name
+              - email
+              - roles
+        idToken:
+          validityPeriod: 3600
+      scopeClaims:
+        roles:
+          - roles
+          - email
