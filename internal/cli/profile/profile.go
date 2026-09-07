@@ -17,7 +17,7 @@ import (
 // DefaultName is the profile ondx falls back to when no config file exists
 // yet and none is named explicitly, pre-populated with this repo's
 // docker-compose local-dev stack (ThunderID as IDP, Portal Backend on
-// :3000) so `ondx login` works with zero flags out of the box.
+// :8083) so `ondx login` works with zero flags out of the box.
 const DefaultName = "local"
 
 var defaultLocalProfile = Profile{
@@ -25,7 +25,7 @@ var defaultLocalProfile = Profile{
 	ClientID:     "NDX_CLI",
 	Scopes:       "openid roles email",
 	CallbackPort: 8765,
-	PBURL:        "http://localhost:3000",
+	PBURL:        "http://localhost:8083",
 	Insecure:     true,
 }
 

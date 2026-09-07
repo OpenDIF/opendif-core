@@ -26,7 +26,7 @@ go build -o ondx ./cmd/cli
 ./ondx login
 ```
 
-`ondx` ships with a built-in `local` profile matching this repo's `docker compose` local-dev stack (ThunderID as IDP on `https://localhost:8090`, client `NDX_CLI`, port `8765`, Portal Backend at `http://localhost:3000`), so a bare `ondx login` works out of the box against it — see [Profiles](#profiles) to add other environments (staging, a partner's deployment, ...) or override any of these values.
+`ondx` ships with a built-in `local` profile matching this repo's `docker compose` local-dev stack (ThunderID as IDP on `https://localhost:8090`, client `NDX_CLI`, port `8765`, Portal Backend at `http://localhost:8083`), so a bare `ondx login` works out of the box against it — see [Profiles](#profiles) to add other environments (staging, a partner's deployment, ...) or override any of these values.
 
 This opens your browser to the identity provider's login page, catches the redirect on a local callback server, exchanges the code for a token, and caches it at `~/.openndx/credentials.json`. Every other command reuses that cached token automatically, refreshing it via its `refresh_token` when it's expired — you only need to log in again if the refresh token itself is no longer valid.
 
@@ -48,7 +48,7 @@ This walkthrough uses two members: **DRP** (Department of Registrar of Persons),
 
 ```bash
 ./ondx members create --name "Department of Registrar of Persons" --email drp@drp.gov.lk --phone "+1234567890" \
-  --idp-user-id "01900000-0000-7000-8000-000000000031" --pb-url http://localhost:3000
+  --idp-user-id "01900000-0000-7000-8000-000000000031" --pb-url http://localhost:8083
 # → prints memberId (drpMemberId)
 ```
 
@@ -61,7 +61,7 @@ Fields taken from `cmd/oe/schema.graphql`'s `PersonInfo` type — the ones sourc
   --member-id <drpMemberId> \
   --field person.fullName:public:primary --field person.otherNames:public:primary \
   --field person.permanentAddress:restricted:primary --field person.profession:restricted:primary \
-  --pb-url http://localhost:3000
+  --pb-url http://localhost:8083
 # → prints schemaId, and each field as schemaId:fieldName
 ```
 
@@ -71,7 +71,7 @@ A field must exist as a schema field before it can be granted to an application 
 
 ```bash
 ./ondx members create --name "Department of Immigration and Emigration" --email die@die.gov.lk --phone "+1234567890" \
-  --idp-user-id "01900000-0000-7000-8000-000000000032" --pb-url http://localhost:3000
+  --idp-user-id "01900000-0000-7000-8000-000000000032" --pb-url http://localhost:8083
 # → prints memberId (dieMemberId)
 ```
 
@@ -83,7 +83,7 @@ The passport application needs the applicant's full name and permanent address t
 ./ondx applications create --name "Passport Application" --member-id <dieMemberId> \
   --field <schemaId>:person.fullName --field <schemaId>:person.permanentAddress \
   --idp-application-id <thunder-app-id> --idp-client-id <thunder-client-id> \
-  --pb-url http://localhost:3000
+  --pb-url http://localhost:8083
 # → prints applicationId
 ```
 
@@ -92,7 +92,7 @@ The passport application needs the applicant's full name and permanent address t
 ```bash
 ./ondx policy update --app-id <applicationId> \
   --field <schemaId>:person.fullName --field <schemaId>:person.permanentAddress --field <schemaId>:person.profession \
-  --pb-url http://localhost:3000
+  --pb-url http://localhost:8083
 ```
 
 ## Commands
@@ -113,7 +113,7 @@ Browser-based OAuth2 Authorization Code + PKCE login (RFC 8252). Caches the resu
 | `--no-browser`       | —               | Print the login URL instead of opening a browser                                                                                                                                                                                                                 |
 | `--insecure`         | —               | Skip TLS certificate verification (local dev only — see [TLS](#tls-and---insecure))                                                                                                                                                                              |
 | `--credentials-path` | —               | Where to cache the token (default `~/.openndx/credentials.json`, or `credentials-<profile>.json` for a non-`local` profile)                                                                                                                                      |
-| `--profile`          | `NDX_PROFILE`   | Named profile to source defaults from for this invocation (default: the config file's current profile) — see [Profiles](#ondx-profile-list--ondx-profile-use-name--ondx-profile-set-name-flags)                                                                 |
+| `--profile`          | `NDX_PROFILE`   | Named profile to source defaults from for this invocation (default: the config file's current profile) — see [Profiles](#ondx-profile-list--ondx-profile-use-name--ondx-profile-set-name-flags)                                                                  |
 
 ### `ondx members create`
 
@@ -159,7 +159,7 @@ Shows one application's details and current policy (its granted fields, printed 
 Replaces an application's policy (its granted schema fields). **This is a full replace, not an append** — pass every field the application should end up with, including ones it already has; anything you omit gets revoked. Run `applications get` first to see the current set.
 
 | Flag                          | Description                                    |
-|-------------------------------|-------------------------------------------------|
+|-------------------------------|------------------------------------------------|
 | `--grant-duration`            | e.g. `30d` or `365d` (default: server default) |
 | `--pb-url` (env `NDX_PB_URL`) | Portal Backend base URL                        |
 
