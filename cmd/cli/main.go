@@ -350,6 +350,10 @@ func runLogin(ctx context.Context, args []string) error {
 		return fmt.Errorf("--client-id is required (or set NDX_CLIENT_ID, or configure it in a profile)")
 	}
 
+	if *clientID == profile.ThunderIDCLIClientID && *callbackPort != profile.ThunderIDCallbackPort {
+		return fmt.Errorf("--callback-port must be %d for client %q: ThunderID only accepts the exact redirect URI registered for it in thunderid/bootstrap/application.yaml (http://127.0.0.1:%d/callback)", profile.ThunderIDCallbackPort, profile.ThunderIDCLIClientID, profile.ThunderIDCallbackPort)
+	}
+
 	httpClient := newHTTPClient(*insecure)
 
 	if *issuer != "" && (*authURL == "" || *tokenURL == "") {

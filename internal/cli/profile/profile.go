@@ -20,11 +20,23 @@ import (
 // :8083) so `ondx login` works with zero flags out of the box.
 const DefaultName = "local"
 
+// ThunderIDCLIClientID and ThunderIDCallbackPort are the ndx CLI's OAuth2
+// client ID and redirect callback port as registered with this repo's local
+// ThunderID instance (thunderid/bootstrap/application.yaml). ThunderID
+// rejects any redirect URI other than the exact one registered there
+// (http://127.0.0.1:8765/callback) - a wildcard/wrong port fails login - so
+// `ondx login` must reject any other --callback-port when logging in as this
+// client, rather than silently trying (and failing) against ThunderID.
+const (
+	ThunderIDCLIClientID  = "NDX_CLI"
+	ThunderIDCallbackPort = 8765
+)
+
 var defaultLocalProfile = Profile{
 	Issuer:       "https://localhost:8090",
-	ClientID:     "NDX_CLI",
+	ClientID:     ThunderIDCLIClientID,
 	Scopes:       "openid roles email",
-	CallbackPort: 8765,
+	CallbackPort: ThunderIDCallbackPort,
 	PBURL:        "http://localhost:8083",
 	Insecure:     true,
 }
