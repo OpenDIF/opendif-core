@@ -13,4 +13,36 @@ attributes:
   family_name: Fernando
   mobile_number: "+234564444456"
 credentials:
-  password: "Test@1234"
+  password: "1234"
+---
+# LOCAL-DEV ONLY: the operator account for logging in via the ndx CLI
+# (thunderid/bootstrap/application.yaml, client NDX_CLI). Deliberately separate
+# from ThunderID's own built-in "admin"/"Administrators"/"Administrator" trio
+# (which gate ThunderID's own Console management UI, on the System resource
+# server) — that's a different authorization domain from OpenNDX's own
+# application-level roles, so we don't reuse it here.
+resource_type: user
+id: 01900000-0000-7000-8000-0000000000b1
+type: Person
+ouHandle: default
+attributes:
+  username: ndx-admin
+  sub: ndx-admin
+  email: ndx-admin@openndx.local
+  name: NDX Admin
+  given_name: NDX
+  family_name: Admin
+credentials:
+  password: "1234"
+---
+# Membership group the OpenNDX_Admin role (thunderid/bootstrap/resource.yaml) is
+# assigned to — ThunderID assigns roles to groups, not directly to users (see
+# that file's comment for why).
+resource_type: group
+id: 01900000-0000-7000-8000-0000000000b2
+name: OpenNDX Admins
+description: Members of this group get the OpenNDX_Admin role via ThunderID's group-based role assignment
+ouHandle: default
+members:
+  - id: 01900000-0000-7000-8000-0000000000b1
+    type: user
